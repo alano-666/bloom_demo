@@ -8,5 +8,6 @@ coverage
 .claude/settings.local.json
 packages/shared/src/index.js
 packages/shared/tsconfig.tsbuildinfo
+apps/web/.vite
 apps/web/dist
 apps/api/dist
