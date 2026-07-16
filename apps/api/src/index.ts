@@ -16,7 +16,7 @@ import { demoStore } from "./store.js";
 loadLocalEnv();
 
 const app = express();
-const port = 8787;
+const port = process.env.PORT ?? 8787;
 
 app.use(cors());
 app.use(express.json());
@@ -194,5 +194,5 @@ app.patch("/api/settings", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Bloom API listening on http://localhost:${port}`);
+  console.log(`Bloom API listening on port ${port}`);
 });
