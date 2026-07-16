@@ -1,0 +1,17 @@
+{
+  "name": "bloom-demo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace @bloom/shared && concurrently \"npm run dev --workspace @bloom/api\" \"npm run dev --workspace @bloom/web\"",
+    "dev:web": "npm run dev --workspace @bloom/web",
+    "dev:api": "npm run dev --workspace @bloom/api",
+    "build": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api && npm run build --workspace @bloom/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

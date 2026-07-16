@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(dataviz)",
+      "Bash(npm -v)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl *)",
+      "WebFetch(domain:localhost)",
+      "Bash(python3 -)",
+      "Bash(npm *)",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"profile\"][\"email\"], d[\"settings\"][\"replyStyle\"], len\\(d[\"reportSummary\"][\"highlights\"]\\)\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"thread\"][\"title\"], len\\(d[\"threads\"]\\)\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[0][\"title\"], len\\(d\\)\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(len\\(d[\"tasks\"]\\), d[\"summary\"][:16]\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"parsedSummary\"][:18], len\\(d[\"addedSchedule\"]\\)\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"darkMode\"], d[\"replyStyle\"]\\)')",
+      "Bash(ZAI_API_KEY='42c4c79328524b60a1a71302d7ac60a7.ZOuitZ7HDSvwplOT' ZAI_BASE_URL='https://open.bigmodel.cn/api/paas/v4' ZAI_MODEL='glm-4.5-flash' npm run *)",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"session\"][\"messages\"][-1][\"content\"][:220]\\)')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"session\"][\"messages\"][-1][\"content\"][:220]\\); print\\(\"---\"\\); print\\(d[\"session\"][\"messages\"][-1][\"summary\"][\"taskSuggestion\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"session\"][\"messages\"][-1][\"content\"][:260]\\); print\\(\"---\"\\); print\\(d[\"session\"][\"messages\"][-1][\"summary\"][\"taskSuggestion\"]\\); print\\(d[\"dashboard\"][\"dateLabel\"]\\); print\\(d[\"dashboard\"][\"focusHours\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"session\"][\"messages\"][-1][\"content\"][:260]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"stats\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"habits\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"session\"][\"messages\"][-1][\"content\"][:220]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"radar\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"highlights\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"dashboard\"][\"streakDays\"], d[\"dashboard\"][\"activeDays\"], d[\"dashboard\"][\"screenHours\"], d[\"dashboard\"][\"sleepHours\"], d[\"dashboard\"][\"emotionTrend\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"title\"]\\); print\\(d[\"reportSummary\"][\"summary\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"overview\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"dashboard\"][\"growthScore\"], d[\"dashboard\"][\"streakDays\"], d[\"dashboard\"][\"emotionTrend\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"overview\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"title\"]\\); print\\(d[\"reportSummary\"][\"summary\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"dashboard\"][\"growthScore\"], d[\"dashboard\"][\"streakDays\"], d[\"dashboard\"][\"screenHours\"], d[\"dashboard\"][\"sleepHours\"], d[\"dashboard\"][\"emotionTrend\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"overview\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"radar\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"title\"]\\); print\\(d[\"reportSummary\"][\"summary\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"dashboard\"][\"reminder\"]\\); print\\(\"---\"\\); print\\(d[\"dashboard\"][\"emotionTrend\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"overview\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"title\"]\\); print\\(d[\"reportSummary\"][\"summary\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"dashboard\"][\"reminder\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"highlights\"]\\); print\\(\"---\"\\); print\\(d[\"reportSummary\"][\"title\"]\\); print\\(d[\"reportSummary\"][\"summary\"]\\); print\\(d[\"reportSummary\"][\"nextSuggestion\"]\\);')",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(d[\"reportSummary\"][\"highlights\"]\\); print\\(\"---\"\\); print\\(d[\"dashboard\"][\"reminder\"]\\); print\\(\"---\"\\); print\\(d[\"trajectory\"][\"overview\"]\\);')",
+      "Bash(gh auth *)",
+      "Bash(git *)"
+    ]
+  }
+}
