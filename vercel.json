@@ -5,8 +5,5 @@
   ],
   "buildCommand": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api",
   "installCommand": "npm install",
-  "env": {
-    "ALIBABA_BAILIAN_API_KEY": "@alibaba-bailian-api-key",
-    "ZAI_API_KEY": "@zai-api-key"
-  }
+  "env": {}
 }
