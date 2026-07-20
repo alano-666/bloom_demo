@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "functions": {
+    "apps/api/**/*.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/apps/api/src/index.ts" }
+  ],
+  "buildCommand": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "npm install",
+  "env": {
+    "ALIBABA_BAILIAN_API_KEY": "@alibaba-bailian-api-key",
+    "ZAI_API_KEY": "@zai-api-key"
+  }
+}
