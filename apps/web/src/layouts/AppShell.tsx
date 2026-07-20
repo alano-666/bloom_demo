@@ -34,13 +34,10 @@ export function AppShell() {
       return;
     }
 
-    apiClient.getBootstrap().then((data) => {
-      setBootstrap(data);
-      if (!data.hasOnboarded && location.pathname !== "/onboarding") {
-        navigate("/onboarding", { replace: true });
-      }
+    apiClient.getBootstrap().then(setBootstrap).catch(() => {
+      console.warn("后端不可用，使用离线数据");
     });
-  }, [isAuthenticated, location.pathname, navigate, setBootstrap]);
+  }, [isAuthenticated, navigate, setBootstrap]);
 
   return (
     <div className="flex h-screen overflow-hidden gap-6 p-5 text-text lg:p-7">

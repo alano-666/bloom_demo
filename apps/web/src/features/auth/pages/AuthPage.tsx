@@ -47,9 +47,7 @@ export function AuthPage() {
       return;
     }
     login({ email: loginForm.email });
-    const bootstrap = await apiClient.getBootstrap();
-    setBootstrap(bootstrap);
-    navigate(bootstrap.hasOnboarded ? "/dashboard" : "/onboarding");
+    navigate("/dashboard");
   };
 
   const submitRegister = async () => {
@@ -71,8 +69,6 @@ export function AuthPage() {
     };
     updateDraft(registerForm);
     login({ email: registerForm.email, username: registerForm.username });
-    const bootstrap = await apiClient.submitOnboarding(payload);
-    setBootstrap(bootstrap);
     navigate("/dashboard");
   };
 
