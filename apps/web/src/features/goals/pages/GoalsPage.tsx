@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { ProgressBar } from "@/components/ProgressBar";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useBloomStore } from "@/store/useBloomStore";
+import { getOfflineBootstrap } from "@/lib-offline";
 
 const categories: GrowthDirection[] = ["职业", "学习", "健康", "生活"];
 
@@ -18,7 +19,9 @@ export function GoalsPage() {
   const [progressDraft, setProgressDraft] = useState({ note: "", progressDelta: 6 });
 
   useEffect(() => {
-    if (!bootstrap) apiClient.getBootstrap().then(setBootstrap);
+    if (!bootstrap) apiClient.getBootstrap()
+      .then(setBootstrap)
+      .catch(() => setBootstrap(getOfflineBootstrap("", "")));
   }, [bootstrap, setBootstrap]);
 
   const goals = bootstrap?.goals ?? [];

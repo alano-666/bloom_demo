@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FocusOverlay } from "@/features/dashboard/components/FocusOverlay";
 import { ScheduleDrawer } from "@/features/dashboard/components/ScheduleDrawer";
+import { getOfflineBootstrap } from "@/lib-offline";
 
 export function DashboardPage() {
   const { bootstrap, setBootstrap, updateDashboard, updateGoals, setTrajectory, setReport } = useBloomStore();
@@ -18,11 +19,19 @@ export function DashboardPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isApplyingFocus, setIsApplyingFocus] = useState(false);
   const [focusMinutesInput, setFocusMinutesInput] = useState<string>("");
+  const [loadError, setLoadError] = useState(false);
   const dashboard = bootstrap?.dashboard;
 
   useEffect(() => {
     if (!bootstrap) {
-      apiClient.getBootstrap().then(setBootstrap);
+      apiClient.getBootstrap()
+        .then(setBootstrap)
+        .catch(() => {
+          console.warn("后端不可用，使用离线数据");
+          const offline = getOfflineBootstrap("", "");
+          setBootstrap(offline);
+          setLoadError(true);
+        });
     }
   }, [bootstrap, setBootstrap]);
 
@@ -108,6 +117,11 @@ export function DashboardPage() {
   return (
     <>
       <div className="space-y-6">
+        {loadError ? (
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400">
+            ⚠️ 后端服务不可用，当前显示离线演示数据。部分功能（AI 对话、任务生成等）暂不可用。
+          </div>
+        ) : null}
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <SectionTitle
             eyebrow="Bloom"

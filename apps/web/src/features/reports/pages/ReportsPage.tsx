@@ -7,6 +7,7 @@ import { Pill } from "@/components/Pill";
 import { ScoreRing } from "@/components/ScoreRing";
 import { SectionTitle } from "@/components/SectionTitle";
 import { useBloomStore } from "@/store/useBloomStore";
+import { getOfflineReport } from "@/lib-offline";
 
 const periods: { value: ReportPeriod; label: string }[] = [
   { value: "week", label: "周报" },
@@ -21,10 +22,12 @@ export function ReportsPage() {
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    apiClient.getReport(activePeriod).then((next) => {
-      setReport(next);
-      setExpandedIds([]);
-    });
+    apiClient.getReport(activePeriod)
+      .then((next) => {
+        setReport(next);
+        setExpandedIds([]);
+      })
+      .catch(() => setReport(getOfflineReport(activePeriod)));
   }, [activePeriod, setReport]);
 
   if (!report) {

@@ -22,9 +22,16 @@ import type {
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787/api",
+  timeout: 10000,
 });
 
 export const apiClient = {
+  // Auth endpoints
+  register: async (payload: { email: string; username: string; password: string; grade?: string; mainGoal?: string; mainProblem?: string }) =>
+    (await api.post<{ user: { id: number; email: string; username: string }; bootstrap: any }>("/auth/register", payload)).data,
+  login: async (email: string, password: string) =>
+    (await api.post<{ user: { id: number; email: string; username: string; grade: string; mainGoal: string; mainProblem: string }; bootstrap: any }>("/auth/login", { email, password })).data,
+
   getBootstrap: async () => (await api.get<BootstrapResponse>("/bootstrap")).data,
   submitOnboarding: async (payload: Parameters<typeof api.post<BootstrapResponse>>[1]) => (await api.post<BootstrapResponse>("/onboarding", payload)).data,
   updateProfile: async (payload: UpdateProfileInput) => (await api.patch<BootstrapResponse>("/profile", payload)).data,

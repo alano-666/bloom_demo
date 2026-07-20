@@ -12,14 +12,21 @@ import type {
   UpdateProfileInput,
 } from "@bloom/shared";
 import { demoStore } from "./store.js";
+import { authRouter } from "./auth.js";
 
 loadLocalEnv();
 
 const app = express();
 const port = process.env.PORT ?? 8787;
 
+// Trust proxy for rate limiting behind Render/nginx
+app.set("trust proxy", 1);
+
 app.use(cors());
 app.use(express.json());
+
+// Auth routes (registration, login, rate limiting)
+app.use("/api/auth", authRouter);
 
 const onboardingSchema = z.object({
   name: z.string().min(1),

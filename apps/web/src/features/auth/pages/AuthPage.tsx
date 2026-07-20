@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Mail, Lock, ShieldCheck, User2, Sparkles, BrainCircuit, CircleDashed, ChartNoAxesCombined, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, ShieldCheck, User2, Sparkles, BrainCircuit, CircleDashed, ChartNoAxesCombined, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/Button";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiClient } from "@/lib-api";
 import { useBloomStore } from "@/store/useBloomStore";
+
+type ErrorInfo = { message: string; code?: string; lockedUntil?: string };
 
 export function AuthPage() {
   const navigate = useNavigate();
@@ -15,11 +17,14 @@ export function AuthPage() {
   const [registerForm, setRegisterForm] = useState({
     email: registerDraft.email,
     username: registerDraft.username,
+    password: "",
     verificationCode: registerDraft.verificationCode,
     grade: registerDraft.grade || "大四 / 职场过渡期",
     mainGoal: registerDraft.mainGoal || "进入字节产品团队，形成自己的产品分析方法论",
     mainProblem: registerDraft.mainProblem || "最近在做竞品分析，但不知道如何输出更有价值的洞察",
   });
+  const [error, setError] = useState<ErrorInfo | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -34,7 +39,7 @@ export function AuthPage() {
 
   const triggerCode = () => {
     if (!registerForm.email) {
-      window.alert("请先输入邮箱");
+      setError({ message: "请先输入邮箱" });
       return;
     }
     setCountdown(60);
@@ -42,35 +47,86 @@ export function AuthPage() {
   };
 
   const submitLogin = async () => {
+    setError(null);
     if (!loginForm.email || !loginForm.password) {
-      window.alert("请填写邮箱和密码");
+      setError({ message: "请填写邮箱和密码" });
       return;
     }
-    login({ email: loginForm.email });
-    navigate("/dashboard");
+
+    setIsSubmitting(true);
+    try {
+      // Try backend login first
+      const result = await apiClient.login(loginForm.email, loginForm.password);
+      login({ email: loginForm.email, username: result.user.username });
+      if (result.bootstrap) {
+        setBootstrap(result.bootstrap);
+      }
+      navigate("/dashboard");
+    } catch (err: any) {
+      const data = err?.response?.data as { error?: string; code?: string; lockedUntil?: string } | undefined;
+      if (data?.error) {
+        setError({ message: data.error, code: data.code, lockedUntil: data.lockedUntil });
+      } else if (err?.code === "ECONNABORTED" || !err?.response) {
+        // Backend unreachable - use offline fallback for demo test account
+        if (loginForm.email === "luna@bloom.demo" && loginForm.password === "123456") {
+          login({ email: loginForm.email });
+          navigate("/dashboard");
+          return;
+        }
+        setError({ message: "后端服务不可用。测试账号：luna@bloom.demo / 123456 可离线登录。" });
+      } else {
+        setError({ message: "登录失败，请检查网络连接。" });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const submitRegister = async () => {
+    setError(null);
     if (!canContinue) {
-      window.alert("请先完成邮箱、用户名与验证码填写");
+      setError({ message: "请先完成邮箱、用户名与验证码填写" });
       return;
     }
-    const payload = {
-      name: registerForm.username,
-      username: registerForm.username,
-      email: registerForm.email,
-      grade: registerForm.grade,
-      longTermGoal: registerForm.mainGoal,
-      currentChallenge: registerForm.mainProblem,
-      mainGoal: registerForm.mainGoal,
-      mainProblem: registerForm.mainProblem,
-      growthDirection: "职业" as const,
-      stage: "求职" as const,
-    };
-    updateDraft(registerForm);
-    login({ email: registerForm.email, username: registerForm.username });
-    navigate("/dashboard");
+    if (!registerForm.password || registerForm.password.length < 6) {
+      setError({ message: "密码至少需要 6 个字符" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await apiClient.register({
+        email: registerForm.email,
+        username: registerForm.username,
+        password: registerForm.password,
+        grade: registerForm.grade,
+        mainGoal: registerForm.mainGoal,
+        mainProblem: registerForm.mainProblem,
+      });
+      updateDraft(registerForm);
+      login({ email: registerForm.email, username: registerForm.username });
+      if (result.bootstrap) {
+        setBootstrap(result.bootstrap);
+      }
+      navigate("/dashboard");
+    } catch (err: any) {
+      const data = err?.response?.data as { error?: string; code?: string } | undefined;
+      if (data?.error) {
+        setError({ message: data.error, code: data.code });
+      } else if (err?.code === "ECONNABORTED" || !err?.response) {
+        // Backend unreachable - use offline registration
+        updateDraft(registerForm);
+        login({ email: registerForm.email, username: registerForm.username });
+        navigate("/dashboard");
+      } else {
+        setError({ message: "注册失败，请检查网络连接。" });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const dismissError = () => setError(null);
 
   return (
     <div className="flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(124,77,255,0.18),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(172,155,255,0.18),transparent_26%),#F5F2FF] px-6 py-8 dark:bg-[radial-gradient(circle_at_top_left,rgba(124,77,255,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(172,155,255,0.12),transparent_26%),#120D22]">
@@ -104,7 +160,7 @@ export function AuthPage() {
           </div>
 
           <div className="mt-14 max-w-[460px] text-lg leading-9 text-[#6D648D] dark:text-[#C5BFDF]">
-            “每一个微小的行动，<br />都会让未来的你感谢现在的自己。”
+            "每一个微小的行动，<br />都会让未来的你感谢现在的自己。"
           </div>
 
           <div className="pointer-events-none absolute bottom-[-40px] right-[-20px] h-[340px] w-[440px] rounded-full bg-[radial-gradient(circle_at_center,rgba(124,77,255,0.32),rgba(124,77,255,0.06),transparent_72%)] blur-xl" />
@@ -113,13 +169,13 @@ export function AuthPage() {
 
         <section className="rounded-[40px] border border-white/60 bg-white px-8 py-8 shadow-card dark:border-white/10 dark:bg-[#171127] xl:px-10">
           <div className="flex items-center gap-3 text-sm font-semibold">
-            <button className={`interactive rounded-full px-4 py-2 ${authMode === "login" ? "bg-primary-500 text-white shadow-soft" : "bg-primary-50 text-primary-600 dark:bg-[#261D46] dark:text-[#D8CDFF]"}`} onClick={() => setAuthMode("login")}>登录</button>
-            <button className={`interactive rounded-full px-4 py-2 ${authMode === "register" ? "bg-primary-500 text-white shadow-soft" : "bg-primary-50 text-primary-600 dark:bg-[#261D46] dark:text-[#D8CDFF]"}`} onClick={() => setAuthMode("register")}>注册</button>
+            <button className={`interactive rounded-full px-4 py-2 ${authMode === "login" ? "bg-primary-500 text-white shadow-soft" : "bg-primary-50 text-primary-600 dark:bg-[#261D46] dark:text-[#D8CDFF]"}`} onClick={() => { setAuthMode("login"); setError(null); }}>登录</button>
+            <button className={`interactive rounded-full px-4 py-2 ${authMode === "register" ? "bg-primary-500 text-white shadow-soft" : "bg-primary-50 text-primary-600 dark:bg-[#261D46] dark:text-[#D8CDFF]"}`} onClick={() => { setAuthMode("register"); setError(null); }}>注册</button>
           </div>
 
           <div className="mt-8">
-            <h2 className="text-[42px] font-semibold tracking-tight text-text">欢迎回来 👋</h2>
-            <p className="mt-3 text-base text-muted">登录 Bloom，继续你的成长之旅</p>
+            <h2 className="text-[42px] font-semibold tracking-tight text-text">{authMode === "login" ? "欢迎回来 👋" : "加入 Bloom 🌱"}</h2>
+            <p className="mt-3 text-base text-muted">{authMode === "login" ? "登录 Bloom，继续你的成长之旅" : "注册 Bloom，开启你的成长之路"}</p>
           </div>
 
           {authMode === "login" ? (
@@ -142,9 +198,11 @@ export function AuthPage() {
                 />
               </Field>
               <div className="flex justify-end">
-                <button className="interactive text-sm font-semibold text-primary-500" onClick={() => window.alert("当前为虚拟登录流程，暂未接入找回密码。")}>忘记密码？</button>
+                <button className="interactive text-sm font-semibold text-primary-500" onClick={() => window.alert("当前为演示环境，测试账号：luna@bloom.demo / 123456")}>忘记密码？</button>
               </div>
-              <Button fullWidth onClick={submitLogin}>登录</Button>
+              {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+              <Button fullWidth onClick={submitLogin} disabled={isSubmitting}>{isSubmitting ? "登录中..." : "登录"}</Button>
+              <p className="text-center text-xs text-muted">测试账号：luna@bloom.demo / 123456</p>
             </div>
           ) : (
             <div className="mt-8 space-y-5">
@@ -153,6 +211,15 @@ export function AuthPage() {
               </Field>
               <Field label="用户名" icon={<User2 className="h-4 w-4" />}>
                 <input value={registerForm.username} onChange={(event) => setRegisterForm((state) => ({ ...state, username: event.target.value }))} placeholder="请输入用户名" className="w-full bg-transparent outline-none" />
+              </Field>
+              <Field label="密码" icon={<Lock className="h-4 w-4" />}>
+                <input
+                  type="password"
+                  value={registerForm.password}
+                  onChange={(event) => setRegisterForm((state) => ({ ...state, password: event.target.value }))}
+                  placeholder="至少 6 个字符"
+                  className="w-full bg-transparent outline-none"
+                />
               </Field>
               <div>
                 <div className="mb-3 text-sm font-semibold text-text">虚拟验证码</div>
@@ -177,7 +244,8 @@ export function AuthPage() {
                   </Field>
                 </div>
               ) : null}
-              <Button fullWidth onClick={submitRegister}>注册并开始成长</Button>
+              {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
+              <Button fullWidth onClick={submitRegister} disabled={isSubmitting}>{isSubmitting ? "注册中..." : "注册并开始成长"}</Button>
             </div>
           )}
 
@@ -206,6 +274,16 @@ export function AuthPage() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+function ErrorBanner({ error, onDismiss }: { error: ErrorInfo; onDismiss: () => void }) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="flex-1">{error.message}</div>
+      <button className="shrink-0 font-semibold text-red-500 hover:text-red-700" onClick={onDismiss}>✕</button>
     </div>
   );
 }

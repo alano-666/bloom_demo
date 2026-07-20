@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Calendar, ChartColumnBig, Goal, Home, MessageCircle, Settings, Sparkles } from "lucide-react";
 import { useBloomStore } from "@/store/useBloomStore";
 import { apiClient } from "@/lib-api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTheme } from "@/hooks/useTheme";
 import { ProfileModal } from "@/features/settings/components/ProfileModal";
+import { getOfflineBootstrap } from "@/lib-offline";
 
 const navItems = [
   { to: "/dashboard", label: "今日成长", icon: Home },
@@ -18,9 +19,8 @@ const navItems = [
 
 export function AppShell() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { bootstrap, setBootstrap, setProfileModalOpen } = useBloomStore();
-  const { isAuthenticated, hydrate } = useAuthStore();
+  const { isAuthenticated, hydrate, email, username } = useAuthStore();
 
   useTheme(bootstrap?.settings.darkMode);
 
@@ -34,10 +34,18 @@ export function AppShell() {
       return;
     }
 
-    apiClient.getBootstrap().then(setBootstrap).catch(() => {
-      console.warn("后端不可用，使用离线数据");
-    });
-  }, [isAuthenticated, navigate, setBootstrap]);
+    // Try backend first, fall back to offline data
+    apiClient.getBootstrap()
+      .then(setBootstrap)
+      .catch(() => {
+        console.warn("后端不可用，使用离线数据");
+        const offline = getOfflineBootstrap(email, username);
+        setBootstrap(offline);
+      });
+  }, [isAuthenticated, navigate, setBootstrap, email, username]);
+
+  const displayName = bootstrap?.profile?.username ?? bootstrap?.profile?.name ?? username ?? "Bloom User";
+  const displayAvatar = bootstrap?.profile?.avatarName ?? (displayName || "L").slice(0, 1).toUpperCase();
 
   return (
     <div className="flex h-screen overflow-hidden gap-6 p-5 text-text lg:p-7">
@@ -75,10 +83,10 @@ export function AppShell() {
         <button className="interactive mt-auto rounded-[24px] border border-line bg-surface/70 p-4 text-left dark:bg-[#1B1531]" onClick={() => setProfileModalOpen(true)}>
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#A78BFA,#7C4DFF)] text-white">
-              {bootstrap?.profile?.avatarName ?? "L"}
+              {displayAvatar}
             </div>
             <div>
-              <div className="text-sm font-semibold">{bootstrap?.profile?.username ?? bootstrap?.profile?.name ?? "Luna"}</div>
+              <div className="text-sm font-semibold">{displayName}</div>
               <div className="text-xs text-muted">点击编辑个人信息</div>
             </div>
           </div>

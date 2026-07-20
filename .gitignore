@@ -11,3 +11,7 @@ packages/shared/tsconfig.tsbuildinfo
 apps/web/.vite
 apps/web/dist
 apps/api/dist
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

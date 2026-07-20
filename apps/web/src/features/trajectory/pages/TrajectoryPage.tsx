@@ -6,13 +6,16 @@ import { RadarChart } from "@/components/RadarChart";
 import { SectionTitle } from "@/components/SectionTitle";
 import { TrendChart } from "@/components/TrendChart";
 import { useBloomStore } from "@/store/useBloomStore";
+import { getOfflineTrajectory } from "@/lib-offline";
 
 export function TrajectoryPage() {
   const { trajectory, setTrajectory } = useBloomStore();
 
   useEffect(() => {
     if (!trajectory) {
-      apiClient.getTrajectory().then(setTrajectory);
+      apiClient.getTrajectory()
+        .then(setTrajectory)
+        .catch(() => setTrajectory(getOfflineTrajectory()));
     }
   }, [setTrajectory, trajectory]);
 
