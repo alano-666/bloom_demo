@@ -19,6 +19,7 @@ interface BloomState {
   report: ReportData | null;
   activeThreadId: string | null;
   profileModalOpen: boolean;
+  clear: () => void;
   setBootstrap: (payload: BootstrapResponse) => void;
   setSession: (payload: SessionResponse) => void;
   setTrajectory: (payload: TrajectoryData) => void;
@@ -41,6 +42,7 @@ export const useBloomStore = create<BloomState>((set) => ({
   report: null,
   activeThreadId: null,
   profileModalOpen: false,
+  clear: () => set({ bootstrap: null, session: null, trajectory: null, report: null, activeThreadId: null, profileModalOpen: false }),
   setBootstrap: (payload) =>
     set((state) => ({
       bootstrap: payload,

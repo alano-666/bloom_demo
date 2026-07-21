@@ -9,7 +9,6 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { SectionTitle } from "@/components/SectionTitle";
 import { FocusOverlay } from "@/features/dashboard/components/FocusOverlay";
 import { ScheduleDrawer } from "@/features/dashboard/components/ScheduleDrawer";
-import { getOfflineBootstrap } from "@/lib-offline";
 
 export function DashboardPage() {
   const { bootstrap, setBootstrap, updateDashboard, updateGoals, setTrajectory, setReport } = useBloomStore();
@@ -19,6 +18,8 @@ export function DashboardPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isApplyingFocus, setIsApplyingFocus] = useState(false);
   const [focusMinutesInput, setFocusMinutesInput] = useState<string>("");
+  const [focusStartedAt, setFocusStartedAt] = useState<number | null>(null);
+  const [focusError, setFocusError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const dashboard = bootstrap?.dashboard;
 
@@ -27,9 +28,7 @@ export function DashboardPage() {
       apiClient.getBootstrap()
         .then(setBootstrap)
         .catch(() => {
-          console.warn("后端不可用，使用离线数据");
-          const offline = getOfflineBootstrap("", "");
-          setBootstrap(offline);
+          console.warn("后端不可用，无法加载个人数据");
           setLoadError(true);
         });
     }
@@ -50,7 +49,11 @@ export function DashboardPage() {
   const progressValue = useMemo(() => dashboard?.dailyPlan.progress ?? 0, [dashboard]);
 
   if (!dashboard) {
-    return <div className="p-10 text-muted">正在加载 Bloom 仪表盘…</div>;
+    return (
+      <div className="p-10 text-muted">
+        {loadError ? "无法连接后端，个人成长数据尚未加载。请稍后刷新重试。" : "正在加载 Bloom 仪表盘…"}
+      </div>
+    );
   }
 
   const greetingTitle = (() => {
@@ -63,11 +66,19 @@ export function DashboardPage() {
     return `早点休息哦，${name}`;
   })();
 
-  const resolvedFocusMinutes = Math.max(5, Number(focusMinutesInput || dashboard.dailyPlan.timeBudgetMinutes || 25));
+  const parsedFocusMinutes = Number(focusMinutesInput || dashboard.dailyPlan.timeBudgetMinutes || 25);
+  const resolvedFocusMinutes = Number.isFinite(parsedFocusMinutes) ? Math.min(240, Math.max(5, Math.round(parsedFocusMinutes))) : 25;
 
   const startFocus = () => {
+    setFocusError(null);
+    setFocusStartedAt(Date.now());
     setSecondsLeft(resolvedFocusMinutes * 60);
     setFocusOpen(true);
+  };
+
+  const getFocusedMinutes = () => {
+    const elapsedMs = focusStartedAt ? Date.now() - focusStartedAt : (resolvedFocusMinutes * 60 - secondsLeft) * 1000;
+    return Math.min(240, Math.max(5, Math.ceil(elapsedMs / 60000)));
   };
 
   const applyFocusResult = (result: Awaited<ReturnType<typeof apiClient.completeFocus>>) => {
@@ -83,30 +94,25 @@ export function DashboardPage() {
     });
   };
 
-  const completeFocus = async () => {
+  const submitFocus = async (markDone: boolean) => {
     if (isApplyingFocus) return;
     setIsApplyingFocus(true);
+    setFocusError(null);
     try {
-      const result = await apiClient.completeFocus(Math.max(5, Math.round((resolvedFocusMinutes * 60 - secondsLeft) / 60) || resolvedFocusMinutes), true);
+      const result = await apiClient.completeFocus(getFocusedMinutes(), markDone);
       applyFocusResult(result);
       setFocusOpen(false);
+      setFocusStartedAt(null);
+    } catch (error: any) {
+      const message = error?.response?.data?.error ?? "无法保存本次专注数据，请检查网络后重试。";
+      setFocusError(message);
     } finally {
       setIsApplyingFocus(false);
     }
   };
 
-  const pauseFocus = async () => {
-    if (isApplyingFocus) return;
-    setIsApplyingFocus(true);
-    try {
-      const focusedMinutes = Math.max(5, Math.round((resolvedFocusMinutes * 60 - secondsLeft) / 60));
-      const result = await apiClient.completeFocus(focusedMinutes, false);
-      applyFocusResult(result);
-      setFocusOpen(false);
-    } finally {
-      setIsApplyingFocus(false);
-    }
-  };
+  const completeFocus = () => submitFocus(true);
+  const pauseFocus = () => submitFocus(false);
 
   const decomposeTask = async () => {
     const result = await apiClient.decomposeTask();
@@ -249,7 +255,20 @@ export function DashboardPage() {
         }}
       />
 
-      {focusOpen ? <FocusOverlay secondsLeft={secondsLeft} onPause={pauseFocus} onEndTask={completeFocus} /> : null}
+      {focusOpen ? (
+        <FocusOverlay
+          secondsLeft={secondsLeft}
+          onPause={pauseFocus}
+          onEndTask={completeFocus}
+          onClose={() => {
+            setFocusOpen(false);
+            setFocusStartedAt(null);
+            setFocusError(null);
+          }}
+          isSubmitting={isApplyingFocus}
+          error={focusError}
+        />
+      ) : null}
     </>
   );
 }

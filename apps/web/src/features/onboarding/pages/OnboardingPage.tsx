@@ -7,6 +7,7 @@ import { Sparkles } from "lucide-react";
 import { apiClient } from "@/lib-api";
 import { Button } from "@/components/Button";
 import { useBloomStore } from "@/store/useBloomStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const stages: NonNullable<OnboardingInput["stage"]>[] = ["学生", "求职", "职场", "创业"];
 const directions: NonNullable<OnboardingInput["growthDirection"]>[] = ["职业", "健康", "学习", "生活"];
@@ -14,19 +15,20 @@ const directions: NonNullable<OnboardingInput["growthDirection"]>[] = ["职业",
 export function OnboardingPage() {
   const navigate = useNavigate();
   const { bootstrap, setBootstrap } = useBloomStore();
+  const { email, username } = useAuthStore();
   const { register, handleSubmit, watch } = useForm<OnboardingInput>({
     defaultValues: {
-      name: bootstrap?.profile?.name ?? "Luna",
-      username: bootstrap?.profile?.username ?? "Luna",
-      email: bootstrap?.profile?.email ?? "luna@bloom.demo",
-      grade: bootstrap?.profile?.grade ?? "大四 / 职场过渡期",
-      age: bootstrap?.profile?.age ?? 24,
-      stage: bootstrap?.profile?.stage ?? "职场",
-      growthDirection: bootstrap?.profile?.growthDirection ?? "职业",
-      longTermGoal: bootstrap?.profile?.mainGoal ?? "进入字节产品团队，形成自己的产品分析方法论",
-      currentChallenge: bootstrap?.profile?.mainProblem ?? "最近在做竞品分析，但不知道如何输出更有价值的洞察",
-      mainGoal: bootstrap?.profile?.mainGoal ?? "进入字节产品团队，形成自己的产品分析方法论",
-      mainProblem: bootstrap?.profile?.mainProblem ?? "最近在做竞品分析，但不知道如何输出更有价值的洞察",
+      name: bootstrap?.profile?.name ?? username,
+      username: bootstrap?.profile?.username ?? username,
+      email: bootstrap?.profile?.email ?? email,
+      grade: bootstrap?.profile?.grade ?? "",
+      age: bootstrap?.profile?.age,
+      stage: bootstrap?.profile?.stage ?? "学生",
+      growthDirection: bootstrap?.profile?.growthDirection ?? "学习",
+      longTermGoal: bootstrap?.profile?.mainGoal ?? "",
+      currentChallenge: bootstrap?.profile?.mainProblem ?? "",
+      mainGoal: bootstrap?.profile?.mainGoal ?? "",
+      mainProblem: bootstrap?.profile?.mainProblem ?? "",
     },
   });
 
@@ -43,7 +45,12 @@ export function OnboardingPage() {
   }, [values]);
 
   const onSubmit = handleSubmit(async (payload) => {
-    const result = await apiClient.submitOnboarding(payload);
+    const normalized = {
+      ...payload,
+      mainGoal: payload.longTermGoal,
+      mainProblem: payload.currentChallenge,
+    };
+    const result = await apiClient.submitOnboarding(normalized);
     setBootstrap(result);
     navigate("/dashboard");
   });

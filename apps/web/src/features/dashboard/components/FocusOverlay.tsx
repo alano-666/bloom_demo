@@ -1,19 +1,24 @@
-import { Flag, PauseCircle } from "lucide-react";
+import { Flag, PauseCircle, X } from "lucide-react";
 import { Button } from "@/components/Button";
 
 export function FocusOverlay({
   secondsLeft,
   onPause,
   onEndTask,
+  onClose,
+  isSubmitting,
+  error,
 }: {
   secondsLeft: number;
   onPause: () => void;
   onEndTask: () => void;
+  onClose: () => void;
+  isSubmitting: boolean;
+  error: string | null;
 }) {
-  const minutes = Math.floor(secondsLeft / 60)
-    .toString()
-    .padStart(2, "0");
-  const seconds = (secondsLeft % 60).toString().padStart(2, "0");
+  const safeSeconds = Number.isFinite(secondsLeft) ? Math.max(0, secondsLeft) : 0;
+  const minutes = Math.floor(safeSeconds / 60).toString().padStart(2, "0");
+  const seconds = (safeSeconds % 60).toString().padStart(2, "0");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F0A1F]/96 px-6 backdrop-blur-sm">
@@ -29,12 +34,21 @@ export function FocusOverlay({
           屏幕已经为你暗下来。现在请只专注处理这一件最重要的事，结束后 Bloom 会同步更新任务进度与成长数据。
         </p>
 
+        {error ? (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+            <button className="ml-3 inline-flex items-center gap-1 font-semibold" onClick={onClose}>
+              <X className="h-4 w-4" /> 关闭专注页
+            </button>
+          </div>
+        ) : null}
+
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          <Button variant="secondary" className="border-[#D8CFFF] bg-white/85 text-[#5C32C5] hover:bg-white" onClick={onPause}>
-            <PauseCircle className="mr-2 h-4 w-4" /> 暂停专注
+          <Button disabled={isSubmitting} variant="secondary" className="border-[#D8CFFF] bg-white/85 text-[#5C32C5] hover:bg-white" onClick={onPause}>
+            <PauseCircle className="mr-2 h-4 w-4" /> {isSubmitting ? "正在保存..." : "暂停专注"}
           </Button>
-          <Button className="bg-[#6F3FEA] hover:bg-[#5C32C5]" onClick={onEndTask}>
-            <Flag className="mr-2 h-4 w-4" /> 结束任务
+          <Button disabled={isSubmitting} className="bg-[#6F3FEA] hover:bg-[#5C32C5]" onClick={onEndTask}>
+            <Flag className="mr-2 h-4 w-4" /> {isSubmitting ? "正在保存..." : "结束任务"}
           </Button>
         </div>
       </div>

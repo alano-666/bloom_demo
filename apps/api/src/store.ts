@@ -49,8 +49,16 @@ const formatDateLabel = (date = new Date()) => {
 
 const normalizeMetricDate = (date = new Date()) => `${date.getMonth() + 1}/${date.getDate()}`;
 
-class DemoStore {
-  private state: DemoState = createInitialState();
+export class DemoStore {
+  private state: DemoState;
+
+  constructor(initialState: DemoState = createInitialState()) {
+    this.state = structuredClone(initialState);
+  }
+
+  snapshot() {
+    return structuredClone(this.state);
+  }
 
   getState() {
     return this.state;
@@ -70,8 +78,18 @@ class DemoStore {
 
   async submitOnboarding(input: OnboardingInput) {
     const profile = createOnboardingProfile(input);
-    this.state.profile = profile;
-    this.state.dailyPlan = buildDailyPlanFromProfile(profile);
+    const fresh = createInitialState();
+    this.state = {
+      ...fresh,
+      profile,
+      goals: [],
+      goalLogs: [],
+      events: [],
+      threads: [],
+      messages: [],
+      metrics: [],
+      dailyPlan: buildDailyPlanFromProfile(profile),
+    };
 
     const starterThreadId = "thread-welcome";
     const welcomeMessage = `我已经记住了你的长期目标：${profile.mainGoal}。接下来我会帮助你把这个目标拆解成每天可以完成的小步骤。`;
@@ -435,7 +453,14 @@ class DemoStore {
   }
 
   buildDashboard(): DashboardData {
-    const latestMetric = this.state.metrics[this.state.metrics.length - 1];
+    const latestMetric = this.state.metrics[this.state.metrics.length - 1] ?? {
+      date: normalizeMetricDate(new Date()),
+      growthScore: 0,
+      focusHours: 0,
+      moodScore: 70,
+      checkins: 0,
+      events: 0,
+    };
     const latestEvent = this.state.events[0];
     const emotion = latestEvent ? emotionMap[latestEvent.emotion] : emotionMap.steady;
     const name = this.state.profile?.name ?? "Luna";
@@ -858,5 +883,3 @@ class DemoStore {
     this.state.metrics[this.state.metrics.length - 1] = next;
   }
 }
-
-export const demoStore = new DemoStore();

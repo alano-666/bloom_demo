@@ -14,12 +14,13 @@ interface AuthState {
   authMode: "login" | "register";
   email: string;
   username: string;
+  accessToken: string;
   countdown: number;
   registerDraft: RegisterDraft;
   setAuthMode: (mode: "login" | "register") => void;
   setCountdown: (value: number) => void;
   hydrate: () => void;
-  login: (payload: { email: string; username?: string }) => void;
+  login: (payload: { email: string; username?: string; accessToken: string }) => void;
   syncProfile: (payload: { email?: string; username: string }) => void;
   logout: () => void;
   updateDraft: (payload: Partial<RegisterDraft>) => void;
@@ -27,7 +28,7 @@ interface AuthState {
 
 const AUTH_KEY = "bloom-auth";
 
-const persistAuth = (payload: Pick<AuthState, "isAuthenticated" | "email" | "username">) => {
+const persistAuth = (payload: Pick<AuthState, "isAuthenticated" | "email" | "username" | "accessToken">) => {
   localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
 };
 
@@ -36,6 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   authMode: "login",
   email: "",
   username: "",
+  accessToken: "",
   countdown: 0,
   registerDraft: {
     email: "",
@@ -51,21 +53,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     const raw = localStorage.getItem(AUTH_KEY);
     if (!raw) return;
     try {
-      const parsed = JSON.parse(raw) as { isAuthenticated: boolean; email: string; username: string };
+      const parsed = JSON.parse(raw) as { isAuthenticated: boolean; email: string; username: string; accessToken?: string };
       set({
-        isAuthenticated: parsed.isAuthenticated,
+        isAuthenticated: parsed.isAuthenticated && Boolean(parsed.accessToken),
         email: parsed.email,
         username: parsed.username,
+        accessToken: parsed.accessToken ?? "",
       });
     } catch {
       localStorage.removeItem(AUTH_KEY);
     }
   },
-  login: ({ email, username }) => {
+  login: ({ email, username, accessToken }) => {
     const payload = {
       isAuthenticated: true,
       email,
       username: username ?? email.split("@")[0] ?? "Bloom User",
+      accessToken,
     };
     persistAuth(payload);
     set(payload);
@@ -76,6 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: state.isAuthenticated,
         email: email ?? state.email,
         username,
+        accessToken: state.accessToken,
       };
       persistAuth(payload);
       return payload;
@@ -86,6 +91,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isAuthenticated: false,
       email: "",
       username: "",
+      accessToken: "",
       countdown: 0,
       authMode: "login",
       registerDraft: {

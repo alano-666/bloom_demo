@@ -6,7 +6,6 @@ import { apiClient } from "@/lib-api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTheme } from "@/hooks/useTheme";
 import { ProfileModal } from "@/features/settings/components/ProfileModal";
-import { getOfflineBootstrap } from "@/lib-offline";
 
 const navItems = [
   { to: "/dashboard", label: "今日成长", icon: Home },
@@ -19,8 +18,8 @@ const navItems = [
 
 export function AppShell() {
   const navigate = useNavigate();
-  const { bootstrap, setBootstrap, setProfileModalOpen } = useBloomStore();
-  const { isAuthenticated, hydrate, email, username } = useAuthStore();
+  const { bootstrap, setBootstrap, setProfileModalOpen, clear } = useBloomStore();
+  const { isAuthenticated, hydrate, username } = useAuthStore();
 
   useTheme(bootstrap?.settings.darkMode);
 
@@ -30,19 +29,20 @@ export function AppShell() {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      clear();
       navigate("/auth", { replace: true });
       return;
     }
 
-    // Try backend first, fall back to offline data
     apiClient.getBootstrap()
-      .then(setBootstrap)
+      .then((payload) => {
+        setBootstrap(payload);
+        if (!payload.hasOnboarded) navigate("/onboarding", { replace: true });
+      })
       .catch(() => {
-        console.warn("后端不可用，使用离线数据");
-        const offline = getOfflineBootstrap(email, username);
-        setBootstrap(offline);
+        console.warn("后端不可用，无法加载个人数据");
       });
-  }, [isAuthenticated, navigate, setBootstrap, email, username]);
+  }, [isAuthenticated, navigate, setBootstrap, clear]);
 
   const displayName = bootstrap?.profile?.username ?? bootstrap?.profile?.name ?? username ?? "Bloom User";
   const displayAvatar = bootstrap?.profile?.avatarName ?? (displayName || "L").slice(0, 1).toUpperCase();

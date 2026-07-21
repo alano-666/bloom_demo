@@ -7,7 +7,6 @@ import { Card } from "@/components/Card";
 import { SectionTitle } from "@/components/SectionTitle";
 import { NewThreadModal } from "@/features/session/components/NewThreadModal";
 import { IconButton } from "@/components/IconButton";
-import { getOfflineBootstrap, getOfflineSession } from "@/lib-offline";
 
 export function SessionPage() {
   const { bootstrap, session, activeThreadId, setActiveThreadId, setSession, mergeFromMessage, setCreatedThread, setBootstrap } = useBloomStore();
@@ -18,20 +17,13 @@ export function SessionPage() {
 
   useEffect(() => {
     if (!bootstrap) {
-      apiClient.getBootstrap()
-        .then(setBootstrap)
-        .catch(() => {
-          console.warn("后端不可用，使用离线数据");
-          setBootstrap(getOfflineBootstrap("", ""));
-        });
+      apiClient.getBootstrap().then(setBootstrap);
       return;
     }
     const threadId = activeThreadId ?? bootstrap.recentThreads[0]?.id;
     if (threadId) {
       setActiveThreadId(threadId);
-      apiClient.getSession(threadId)
-        .then(setSession)
-        .catch(() => setSession(getOfflineSession(threadId)));
+      apiClient.getSession(threadId).then(setSession);
     }
   }, [activeThreadId, bootstrap, setActiveThreadId, setBootstrap, setSession]);
 

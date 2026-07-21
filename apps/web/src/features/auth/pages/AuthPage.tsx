@@ -13,15 +13,15 @@ export function AuthPage() {
   const { setBootstrap } = useBloomStore();
   const { authMode, setAuthMode, countdown, setCountdown, login, registerDraft, updateDraft } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: "luna@bloom.demo", password: "123456" });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState({
     email: registerDraft.email,
     username: registerDraft.username,
     password: "",
     verificationCode: registerDraft.verificationCode,
-    grade: registerDraft.grade || "大四 / 职场过渡期",
-    mainGoal: registerDraft.mainGoal || "进入字节产品团队，形成自己的产品分析方法论",
-    mainProblem: registerDraft.mainProblem || "最近在做竞品分析，但不知道如何输出更有价值的洞察",
+    grade: registerDraft.grade,
+    mainGoal: registerDraft.mainGoal,
+    mainProblem: registerDraft.mainProblem,
   });
   const [error, setError] = useState<ErrorInfo | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,23 +57,16 @@ export function AuthPage() {
     try {
       // Try backend login first
       const result = await apiClient.login(loginForm.email, loginForm.password);
-      login({ email: loginForm.email, username: result.user.username });
-      if (result.bootstrap) {
-        setBootstrap(result.bootstrap);
-      }
-      navigate("/dashboard");
+      login({ email: loginForm.email, username: result.user.username, accessToken: result.token });
+      const nextBootstrap = await apiClient.getBootstrap();
+      setBootstrap(nextBootstrap);
+      navigate(nextBootstrap.hasOnboarded ? "/dashboard" : "/onboarding");
     } catch (err: any) {
       const data = err?.response?.data as { error?: string; code?: string; lockedUntil?: string } | undefined;
       if (data?.error) {
         setError({ message: data.error, code: data.code, lockedUntil: data.lockedUntil });
       } else if (err?.code === "ECONNABORTED" || !err?.response) {
-        // Backend unreachable - use offline fallback for demo test account
-        if (loginForm.email === "luna@bloom.demo" && loginForm.password === "123456") {
-          login({ email: loginForm.email });
-          navigate("/dashboard");
-          return;
-        }
-        setError({ message: "后端服务不可用。测试账号：luna@bloom.demo / 123456 可离线登录。" });
+        setError({ message: "后端服务暂时无法连接，请稍后重试。" });
       } else {
         setError({ message: "登录失败，请检查网络连接。" });
       }
@@ -88,6 +81,10 @@ export function AuthPage() {
       setError({ message: "请先完成邮箱、用户名与验证码填写" });
       return;
     }
+    if (!registerForm.grade.trim() || !registerForm.mainGoal.trim() || !registerForm.mainProblem.trim()) {
+      setError({ message: "请完整填写年级、主要目标和当前问题" });
+      return;
+    }
     if (!registerForm.password || registerForm.password.length < 6) {
       setError({ message: "密码至少需要 6 个字符" });
       return;
@@ -99,25 +96,33 @@ export function AuthPage() {
         email: registerForm.email,
         username: registerForm.username,
         password: registerForm.password,
+      });
+      if (!result.token) {
+        setError({ message: "注册成功，请先在邮箱中完成确认，再返回登录。" });
+        return;
+      }
+      updateDraft(registerForm);
+      login({ email: registerForm.email, username: registerForm.username, accessToken: result.token });
+      const profile = await apiClient.submitOnboarding({
+        name: registerForm.username,
+        username: registerForm.username,
+        email: registerForm.email,
         grade: registerForm.grade,
+        longTermGoal: registerForm.mainGoal,
+        currentChallenge: registerForm.mainProblem,
         mainGoal: registerForm.mainGoal,
         mainProblem: registerForm.mainProblem,
+        growthDirection: "职业",
+        stage: "求职",
       });
-      updateDraft(registerForm);
-      login({ email: registerForm.email, username: registerForm.username });
-      if (result.bootstrap) {
-        setBootstrap(result.bootstrap);
-      }
+      setBootstrap(profile);
       navigate("/dashboard");
     } catch (err: any) {
       const data = err?.response?.data as { error?: string; code?: string } | undefined;
       if (data?.error) {
         setError({ message: data.error, code: data.code });
       } else if (err?.code === "ECONNABORTED" || !err?.response) {
-        // Backend unreachable - use offline registration
-        updateDraft(registerForm);
-        login({ email: registerForm.email, username: registerForm.username });
-        navigate("/dashboard");
+        setError({ message: "后端服务暂时无法连接，注册信息尚未保存，请稍后重试。" });
       } else {
         setError({ message: "注册失败，请检查网络连接。" });
       }
@@ -202,7 +207,6 @@ export function AuthPage() {
               </div>
               {error ? <ErrorBanner error={error} onDismiss={dismissError} /> : null}
               <Button fullWidth onClick={submitLogin} disabled={isSubmitting}>{isSubmitting ? "登录中..." : "登录"}</Button>
-              <p className="text-center text-xs text-muted">测试账号：luna@bloom.demo / 123456</p>
             </div>
           ) : (
             <div className="mt-8 space-y-5">

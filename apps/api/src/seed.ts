@@ -231,6 +231,30 @@ const messages: Message[] = [
   },
 ];
 
+const defaultSettings = {
+  reminderEnabled: true,
+  reminderWindow: "09:00",
+  eveningReviewTime: "21:00",
+  voiceEnabled: true,
+  imageEnabled: false,
+  personalizedRhythm: true,
+  darkMode: false,
+  fontScale: "中" as const,
+  replyStyle: "治愈陪伴" as const,
+};
+
+export const createEmptyState = (): DemoState => ({
+  profile: null,
+  goals: [],
+  goalLogs: [],
+  events: [],
+  threads: [],
+  messages: [],
+  dailyPlan: null,
+  metrics: [],
+  settings: structuredClone(defaultSettings),
+});
+
 export const createInitialState = (): DemoState => ({
   profile: baseProfile,
   goals: structuredClone(goals),
