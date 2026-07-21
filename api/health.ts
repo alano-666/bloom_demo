@@ -1,11 +1,7 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-
-export default function health(_req: IncomingMessage, res: ServerResponse) {
-  res.statusCode = 200;
-  res.setHeader("content-type", "application/json; charset=utf-8");
-  res.end(JSON.stringify({
+export default function health(_request: any, response: any) {
+  response.status(200).json({
     ok: true,
     runtime: "vercel-node",
     storageConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
-  }));
+  });
 }
