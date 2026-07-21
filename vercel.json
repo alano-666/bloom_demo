@@ -8,9 +8,13 @@
       "memory": 512,
       "maxDuration": 30,
       "includeFiles": "apps/api/dist/**"
+    },
+    "api/health.ts": {
+      "memory": 128,
+      "maxDuration": 10
     }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" }
+    { "source": "/api/:path((?!health).*)", "destination": "/api" }
   ]
 }
