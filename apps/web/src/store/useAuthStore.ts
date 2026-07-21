@@ -11,6 +11,7 @@ interface RegisterDraft {
 
 interface AuthState {
   isAuthenticated: boolean;
+  hasHydrated: boolean;
   authMode: "login" | "register";
   email: string;
   username: string;
@@ -34,6 +35,7 @@ const persistAuth = (payload: Pick<AuthState, "isAuthenticated" | "email" | "use
 
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
+  hasHydrated: false,
   authMode: "login",
   email: "",
   username: "",
@@ -51,7 +53,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setCountdown: (countdown) => set({ countdown }),
   hydrate: () => {
     const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return;
+    if (!raw) {
+      set({ hasHydrated: true });
+      return;
+    }
     try {
       const parsed = JSON.parse(raw) as { isAuthenticated: boolean; email: string; username: string; accessToken?: string };
       set({
@@ -59,9 +64,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         email: parsed.email,
         username: parsed.username,
         accessToken: parsed.accessToken ?? "",
+        hasHydrated: true,
       });
     } catch {
       localStorage.removeItem(AUTH_KEY);
+      set({ hasHydrated: true });
     }
   },
   login: ({ email, username, accessToken }) => {

@@ -19,7 +19,7 @@ const navItems = [
 export function AppShell() {
   const navigate = useNavigate();
   const { bootstrap, setBootstrap, setProfileModalOpen, clear } = useBloomStore();
-  const { isAuthenticated, hydrate, username } = useAuthStore();
+  const { isAuthenticated, hasHydrated, hydrate, username } = useAuthStore();
 
   useTheme(bootstrap?.settings.darkMode);
 
@@ -28,6 +28,7 @@ export function AppShell() {
   }, [hydrate]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated) {
       clear();
       navigate("/auth", { replace: true });
@@ -42,7 +43,7 @@ export function AppShell() {
       .catch(() => {
         console.warn("后端不可用，无法加载个人数据");
       });
-  }, [isAuthenticated, navigate, setBootstrap, clear]);
+  }, [isAuthenticated, hasHydrated, navigate, setBootstrap, clear]);
 
   const displayName = bootstrap?.profile?.username ?? bootstrap?.profile?.name ?? username ?? "Bloom User";
   const displayAvatar = bootstrap?.profile?.avatarName ?? (displayName || "L").slice(0, 1).toUpperCase();
