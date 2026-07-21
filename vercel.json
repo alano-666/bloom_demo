@@ -5,18 +5,11 @@
   "buildCommand": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api",
   "functions": {
     "api/index.ts": {
-      "memory": 512,
       "maxDuration": 30,
       "includeFiles": "apps/api/dist/**"
-    },
-    "api/[...path].js": {
-      "memory": 512,
-      "maxDuration": 30,
-      "includeFiles": "apps/api/dist/**"
-    },
-    "api/health.js": {
-      "memory": 128,
-      "maxDuration": 10
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ]
 }

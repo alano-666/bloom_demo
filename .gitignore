@@ -15,3 +15,5 @@ apps/api/dist
 *.db-journal
 *.db-wal
 *.db-shm
+.vercel
+.env*
