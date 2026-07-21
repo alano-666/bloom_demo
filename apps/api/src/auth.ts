@@ -1,51 +1,55 @@
-import { Router, Request, Response } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
 import { demoStore } from "./store.js";
-import rateLimit from "express-rate-limit";
-import type { StoredUser } from "./user-store.js";
+import { createMemoryUserStore } from "./memory-user-store.js";
 
-// Pluggable user store — set before routes are registered
-let userStore: {
-  findByEmail(email: string): StoredUser | undefined;
-  create(user: { email: string; username: string; password_hash: string; grade: string; main_goal: string; main_problem: string }): StoredUser;
-  updateFailedAttempts(email: string, attempts: number, lockedUntil: string | null): void;
-  resetFailedAttempts(email: string): void;
-} | null = null;
+const scryptAsync = promisify(scrypt);
+const defaultUserStore = createMemoryUserStore();
 
-export function setUserStore(store: typeof userStore) {
+let userStore = defaultUserStore;
+
+export function setUserStore(store: typeof defaultUserStore) {
   userStore = store;
 }
 
-function getStore() {
-  if (!userStore) {
-    const { createMemoryUserStore } = require("./memory-user-store.js");
-    userStore = createMemoryUserStore();
-  }
-  return userStore!;
+async function hashPassword(password: string) {
+  const salt = randomUUID().replaceAll("-", "");
+  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${derived.toString("hex")}`;
 }
 
-export const authRouter = Router();
+async function verifyPassword(password: string, storedHash: string) {
+  const [salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
+  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+  const expected = Buffer.from(hash, "hex");
+  return expected.length === derived.length && timingSafeEqual(expected, derived);
+}
 
-// Rate limit: max 5 registration attempts per hour per IP
-const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  message: { error: "注册过于频繁，请稍后再试。", code: "IP_BLOCKED" },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
-});
+type RateWindow = { hits: number[] };
+const rateWindows = new Map<string, RateWindow>();
 
-// Rate limit: max 10 login attempts per 15 minutes per IP
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: "登录尝试过于频繁，请 15 分钟后再试。", code: "IP_BLOCKED" },
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { trustProxy: false },
-});
+function limitByIp(prefix: string, windowMs: number, max: number, message: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const key = `${prefix}:${ip}`;
+    const window = rateWindows.get(key) ?? { hits: [] };
+    window.hits = window.hits.filter((hit) => now - hit < windowMs);
+    if (window.hits.length >= max) {
+      res.status(429).json({ error: message, code: "IP_BLOCKED" });
+      return;
+    }
+    window.hits.push(now);
+    rateWindows.set(key, window);
+    next();
+  };
+}
+
+const registerLimiter = limitByIp("register", 60 * 60 * 1000, 5, "注册过于频繁，请稍后再试。");
+const loginLimiter = limitByIp("login", 15 * 60 * 1000, 10, "登录尝试过于频繁，请 15 分钟后再试。");
 
 const registerSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
@@ -61,27 +65,24 @@ const loginSchema = z.object({
   password: z.string().min(1, "请输入密码"),
 });
 
-// POST /api/auth/register
-authRouter.post("/register", registerLimiter, async (req: Request, res: Response) => {
+export const authRouter = Router();
+
+authRouter.post("/register", registerLimiter, async (req, res) => {
   try {
     const body = registerSchema.parse(req.body);
-    const store = getStore();
-
-    if (store.findByEmail(body.email)) {
+    if (userStore.findByEmail(body.email)) {
       res.status(409).json({ error: "该邮箱已注册，请直接登录。", code: "EMAIL_EXISTS" });
       return;
     }
 
-    const passwordHash = await bcrypt.hash(body.password, 12);
-    const user = store.create({
+    const user = userStore.create({
       email: body.email,
       username: body.username,
-      password_hash: passwordHash,
+      password_hash: await hashPassword(body.password),
       grade: body.grade ?? "",
       main_goal: body.mainGoal ?? "",
       main_problem: body.mainProblem ?? "",
     });
-
     const bootstrap = await demoStore.submitOnboarding({
       name: body.username,
       username: body.username,
@@ -93,74 +94,65 @@ authRouter.post("/register", registerLimiter, async (req: Request, res: Response
       mainProblem: body.mainProblem,
     });
 
-    res.json({ user: { id: user.id, email: body.email, username: body.username }, bootstrap });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(422).json({ error: err.issues[0].message, code: "VALIDATION_ERROR" });
+    res.json({ user: { id: user.id, email: user.email, username: user.username }, bootstrap });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(422).json({ error: error.issues[0]?.message ?? "输入无效", code: "VALIDATION_ERROR" });
       return;
     }
-    console.error("Register error:", err);
+    console.error("Register error:", error);
     res.status(500).json({ error: "注册失败，请稍后再试。", code: "SERVER_ERROR" });
   }
 });
 
-// POST /api/auth/login
-authRouter.post("/login", loginLimiter, async (req: Request, res: Response) => {
+authRouter.post("/login", loginLimiter, async (req, res) => {
   try {
     const body = loginSchema.parse(req.body);
-    const store = getStore();
-    const user = store.findByEmail(body.email);
-
+    const user = userStore.findByEmail(body.email);
     if (!user) {
       res.status(401).json({ error: "邮箱或密码错误。", code: "INVALID_CREDENTIALS" });
       return;
     }
 
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      const remainingMinutes = Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60000);
-      res.status(429).json({ error: `账号已被锁定，请 ${remainingMinutes} 分钟后再试。`, code: "ACCOUNT_LOCKED", lockedUntil: user.locked_until });
+      const minutes = Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60000);
+      res.status(429).json({ error: `账号已被锁定，请 ${minutes} 分钟后再试。`, code: "ACCOUNT_LOCKED", lockedUntil: user.locked_until });
       return;
     }
-
-    if (user.locked_until && new Date(user.locked_until) <= new Date()) {
-      store.resetFailedAttempts(body.email);
+    if (user.locked_until) {
+      userStore.resetFailedAttempts(user.email);
       user.failed_attempts = 0;
       user.locked_until = null;
     }
 
-    const valid = await bcrypt.compare(body.password, user.password_hash);
-    if (!valid) {
-      const newAttempts = user.failed_attempts + 1;
-      if (newAttempts >= 5) {
-        const lockUntil = new Date(Date.now() + 3 * 60 * 1000).toISOString();
-        store.updateFailedAttempts(body.email, newAttempts, lockUntil);
-        res.status(429).json({ error: "密码错误次数过多，账号已锁定，请 3 分钟后再试。", code: "ACCOUNT_LOCKED", lockedUntil: lockUntil });
+    if (!(await verifyPassword(body.password, user.password_hash))) {
+      const attempts = user.failed_attempts + 1;
+      if (attempts >= 5) {
+        const lockedUntil = new Date(Date.now() + 3 * 60 * 1000).toISOString();
+        userStore.updateFailedAttempts(user.email, attempts, lockedUntil);
+        res.status(429).json({ error: "密码错误次数过多，账号已锁定，请 3 分钟后再试。", code: "ACCOUNT_LOCKED", lockedUntil });
         return;
       }
-      store.updateFailedAttempts(body.email, newAttempts, null);
-      const remaining = 5 - newAttempts;
-      res.status(401).json({ error: `密码错误，还剩 ${remaining} 次尝试机会。`, code: "WRONG_PASSWORD", remainingAttempts: remaining });
+      userStore.updateFailedAttempts(user.email, attempts, null);
+      res.status(401).json({ error: `密码错误，还剩 ${5 - attempts} 次尝试机会。`, code: "WRONG_PASSWORD", remainingAttempts: 5 - attempts });
       return;
     }
 
-    store.resetFailedAttempts(body.email);
-
-    const bootstrap = demoStore.bootstrap();
+    userStore.resetFailedAttempts(user.email);
     res.json({
       user: { id: user.id, email: user.email, username: user.username, grade: user.grade, mainGoal: user.main_goal, mainProblem: user.main_problem },
-      bootstrap,
+      bootstrap: demoStore.bootstrap(),
     });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      res.status(422).json({ error: err.issues[0].message, code: "VALIDATION_ERROR" });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(422).json({ error: error.issues[0]?.message ?? "输入无效", code: "VALIDATION_ERROR" });
       return;
     }
-    console.error("Login error:", err);
+    console.error("Login error:", error);
     res.status(500).json({ error: "登录失败，请稍后再试。", code: "SERVER_ERROR" });
   }
 });
 
-// GET /api/auth/check
-authRouter.get("/check", (_req: Request, res: Response) => {
-  res.json({ ok: true, message: "Auth service is running" });
+authRouter.get("/check", (_req, res) => {
+  res.json({ ok: true, storage: "memory" });
 });
