@@ -14,7 +14,7 @@
       "maxDuration": 30,
       "includeFiles": "apps/api/dist/**"
     },
-    "api/health.ts": {
+    "api/health.js": {
       "memory": 128,
       "maxDuration": 10
     }
