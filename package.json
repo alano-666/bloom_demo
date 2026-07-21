@@ -1,6 +1,9 @@
 {
   "name": "bloom-demo",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
