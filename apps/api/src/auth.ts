@@ -1,15 +1,35 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { getDb } from "./db.js";
 import { demoStore } from "./store.js";
 import rateLimit from "express-rate-limit";
+import type { StoredUser } from "./user-store.js";
+
+// Pluggable user store — set before routes are registered
+let userStore: {
+  findByEmail(email: string): StoredUser | undefined;
+  create(user: { email: string; username: string; password_hash: string; grade: string; main_goal: string; main_problem: string }): StoredUser;
+  updateFailedAttempts(email: string, attempts: number, lockedUntil: string | null): void;
+  resetFailedAttempts(email: string): void;
+} | null = null;
+
+export function setUserStore(store: typeof userStore) {
+  userStore = store;
+}
+
+function getStore() {
+  if (!userStore) {
+    const { createMemoryUserStore } = require("./memory-user-store.js");
+    userStore = createMemoryUserStore();
+  }
+  return userStore!;
+}
 
 export const authRouter = Router();
 
 // Rate limit: max 5 registration attempts per hour per IP
 const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: "注册过于频繁，请稍后再试。", code: "IP_BLOCKED" },
   standardHeaders: true,
@@ -19,7 +39,7 @@ const registerLimiter = rateLimit({
 
 // Rate limit: max 10 login attempts per 15 minutes per IP
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: "登录尝试过于频繁，请 15 分钟后再试。", code: "IP_BLOCKED" },
   standardHeaders: true,
@@ -45,31 +65,23 @@ const loginSchema = z.object({
 authRouter.post("/register", registerLimiter, async (req: Request, res: Response) => {
   try {
     const body = registerSchema.parse(req.body);
-    const db = getDb();
+    const store = getStore();
 
-    // Check if email already exists
-    const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(body.email);
-    if (existing) {
+    if (store.findByEmail(body.email)) {
       res.status(409).json({ error: "该邮箱已注册，请直接登录。", code: "EMAIL_EXISTS" });
       return;
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(body.password, 12);
+    const user = store.create({
+      email: body.email,
+      username: body.username,
+      password_hash: passwordHash,
+      grade: body.grade ?? "",
+      main_goal: body.mainGoal ?? "",
+      main_problem: body.mainProblem ?? "",
+    });
 
-    // Insert user
-    const result = db.prepare(
-      "INSERT INTO users (email, username, password_hash, grade, main_goal, main_problem) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run(
-      body.email,
-      body.username,
-      passwordHash,
-      body.grade ?? "",
-      body.mainGoal ?? "",
-      body.mainProblem ?? ""
-    );
-
-    // Also submit onboarding to demo store so they get seed data
     const bootstrap = await demoStore.submitOnboarding({
       name: body.username,
       username: body.username,
@@ -81,14 +93,7 @@ authRouter.post("/register", registerLimiter, async (req: Request, res: Response
       mainProblem: body.mainProblem,
     });
 
-    res.json({
-      user: {
-        id: result.lastInsertRowid,
-        email: body.email,
-        username: body.username,
-      },
-      bootstrap,
-    });
+    res.json({ user: { id: user.id, email: body.email, username: body.username }, bootstrap });
   } catch (err) {
     if (err instanceof z.ZodError) {
       res.status(422).json({ error: err.issues[0].message, code: "VALIDATION_ERROR" });
@@ -103,95 +108,46 @@ authRouter.post("/register", registerLimiter, async (req: Request, res: Response
 authRouter.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const body = loginSchema.parse(req.body);
-    const db = getDb();
-    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-
-    const user = db.prepare(
-      "SELECT id, email, username, password_hash, failed_attempts, locked_until, grade, main_goal, main_problem FROM users WHERE email = ?"
-    ).get(body.email) as {
-      id: number;
-      email: string;
-      username: string;
-      password_hash: string;
-      failed_attempts: number;
-      locked_until: string | null;
-      grade: string;
-      main_goal: string;
-      main_problem: string;
-    } | undefined;
+    const store = getStore();
+    const user = store.findByEmail(body.email);
 
     if (!user) {
-      // Record failed attempt for non-existent user
-      db.prepare("INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, 0)").run(ip, body.email);
       res.status(401).json({ error: "邮箱或密码错误。", code: "INVALID_CREDENTIALS" });
       return;
     }
 
-    // Check if account is locked
-    if (user.locked_until) {
-      const lockTime = new Date(user.locked_until);
-      if (lockTime > new Date()) {
-        const remainingMinutes = Math.ceil((lockTime.getTime() - Date.now()) / 60000);
-        db.prepare("INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, 0)").run(ip, body.email);
-        res.status(429).json({
-          error: `账号已被锁定，请 ${remainingMinutes} 分钟后再试。`,
-          code: "ACCOUNT_LOCKED",
-          lockedUntil: user.locked_until,
-        });
-        return;
-      } else {
-        // Lock expired, reset
-        db.prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?").run(user.id);
-        user.failed_attempts = 0;
-        user.locked_until = null;
-      }
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      const remainingMinutes = Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60000);
+      res.status(429).json({ error: `账号已被锁定，请 ${remainingMinutes} 分钟后再试。`, code: "ACCOUNT_LOCKED", lockedUntil: user.locked_until });
+      return;
     }
 
-    // Verify password
+    if (user.locked_until && new Date(user.locked_until) <= new Date()) {
+      store.resetFailedAttempts(body.email);
+      user.failed_attempts = 0;
+      user.locked_until = null;
+    }
+
     const valid = await bcrypt.compare(body.password, user.password_hash);
     if (!valid) {
       const newAttempts = user.failed_attempts + 1;
       if (newAttempts >= 5) {
-        // Lock for 3 minutes
         const lockUntil = new Date(Date.now() + 3 * 60 * 1000).toISOString();
-        db.prepare("UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?").run(newAttempts, lockUntil, user.id);
-        db.prepare("INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, 0)").run(ip, body.email);
-        res.status(429).json({
-          error: "密码错误次数过多，账号已锁定，请 3 分钟后再试。",
-          code: "ACCOUNT_LOCKED",
-          lockedUntil: lockUntil,
-        });
+        store.updateFailedAttempts(body.email, newAttempts, lockUntil);
+        res.status(429).json({ error: "密码错误次数过多，账号已锁定，请 3 分钟后再试。", code: "ACCOUNT_LOCKED", lockedUntil: lockUntil });
         return;
       }
-
-      db.prepare("UPDATE users SET failed_attempts = ? WHERE id = ?").run(newAttempts, user.id);
-      db.prepare("INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, 0)").run(ip, body.email);
-
+      store.updateFailedAttempts(body.email, newAttempts, null);
       const remaining = 5 - newAttempts;
-      res.status(401).json({
-        error: `密码错误，还剩 ${remaining} 次尝试机会。`,
-        code: "WRONG_PASSWORD",
-        remainingAttempts: remaining,
-      });
+      res.status(401).json({ error: `密码错误，还剩 ${remaining} 次尝试机会。`, code: "WRONG_PASSWORD", remainingAttempts: remaining });
       return;
     }
 
-    // Login success - reset failed attempts
-    db.prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL, updated_at = datetime('now') WHERE id = ?").run(user.id);
-    db.prepare("INSERT INTO login_attempts (ip, email, success) VALUES (?, ?, 1)").run(ip, body.email);
+    store.resetFailedAttempts(body.email);
 
-    // Get bootstrap data
     const bootstrap = demoStore.bootstrap();
-
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        grade: user.grade,
-        mainGoal: user.main_goal,
-        mainProblem: user.main_problem,
-      },
+      user: { id: user.id, email: user.email, username: user.username, grade: user.grade, mainGoal: user.main_goal, mainProblem: user.main_problem },
       bootstrap,
     });
   } catch (err) {
@@ -204,7 +160,7 @@ authRouter.post("/login", loginLimiter, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/auth/check - quick check if backend is alive with auth status
+// GET /api/auth/check
 authRouter.get("/check", (_req: Request, res: Response) => {
   res.json({ ok: true, message: "Auth service is running" });
 });

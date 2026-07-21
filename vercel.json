@@ -5,5 +5,11 @@
   ],
   "buildCommand": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api",
   "installCommand": "npm install",
-  "env": {}
+  "outputDirectory": "api",
+  "functions": {
+    "api/index.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  }
 }
