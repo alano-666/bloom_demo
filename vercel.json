@@ -9,7 +9,7 @@
       "maxDuration": 30,
       "includeFiles": "apps/api/dist/**"
     },
-    "api/[...path].ts": {
+    "api/[...path].js": {
       "memory": 512,
       "maxDuration": 30,
       "includeFiles": "apps/api/dist/**"
