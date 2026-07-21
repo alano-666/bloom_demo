@@ -1,6 +1,7 @@
 {
   "name": "bloom-demo",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
