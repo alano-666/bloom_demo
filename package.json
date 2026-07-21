@@ -12,11 +12,6 @@
     "build": "npm run build --workspace @bloom/shared && npm run build --workspace @bloom/api && npm run build --workspace @bloom/web"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
     "concurrently": "^9.2.1"
-  },
-  "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "express-rate-limit": "^8.6.0"
   }
 }
