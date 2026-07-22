@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { createSupabaseAuthClient, isSupabaseConfigured } from "./supabase.js";
+import { createSupabaseAdminClient, createSupabaseAuthClient } from "./supabase.js";
 
 const registerSchema = z.object({
   email: z.string().email("请输入有效邮箱"),
@@ -18,25 +18,44 @@ export const authRouter = Router();
 authRouter.post("/register", async (req, res) => {
   try {
     const input = registerSchema.parse(req.body);
-    const client = createSupabaseAuthClient();
-    if (!client) {
-      if (process.env.VERCEL) {
-        res.status(503).json({ code: "AUTH_NOT_CONFIGURED", error: "线上身份服务尚未配置，请联系管理员。" });
-        return;
-      }
-      const id = `local-${Buffer.from(input.email).toString("base64url")}`;
-      res.json({ user: { id, email: input.email, username: input.username }, token: `local:${id}` });
+    const anonClient = createSupabaseAuthClient();
+    if (!anonClient) {
+      res.status(503).json({ code: "AUTH_NOT_CONFIGURED", error: "线上身份服务尚未配置。" });
       return;
     }
-    const { data, error } = await client.auth.signUp({
+
+    // Register with Supabase Auth using anon key
+    const { data, error } = await anonClient.auth.signUp({
       email: input.email,
       password: input.password,
       options: { data: { username: input.username } },
     });
+
+    // If signUp succeeded but user needs email confirmation, use admin client to confirm immediately
+    if (data?.user && !data.session) {
+      const adminClient = createSupabaseAdminClient();
+      if (adminClient) {
+        await adminClient.auth.admin.updateUserById(data.user.id, { email_confirm: true });
+        // Now sign in to get a session
+        const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
+          email: input.email,
+          password: input.password,
+        });
+        if (signInData?.session) {
+          res.json({
+            user: { id: signInData.user.id, email: signInData.user.email, username: input.username },
+            token: signInData.session.access_token,
+          });
+          return;
+        }
+      }
+    }
+
     if (error || !data.user) {
       res.status(400).json({ code: "REGISTER_FAILED", error: error?.message ?? "注册失败" });
       return;
     }
+
     res.json({
       user: { id: data.user.id, email: data.user.email, username: input.username },
       token: data.session?.access_token ?? null,
@@ -47,7 +66,8 @@ authRouter.post("/register", async (req, res) => {
       res.status(422).json({ code: "VALIDATION_ERROR", error: error.issues[0]?.message ?? "输入无效" });
       return;
     }
-    throw error;
+    console.error("Register error:", error);
+    res.status(500).json({ code: "SERVER_ERROR", error: "服务暂时不可用。" });
   }
 });
 
@@ -56,12 +76,7 @@ authRouter.post("/login", async (req, res) => {
     const input = loginSchema.parse(req.body);
     const client = createSupabaseAuthClient();
     if (!client) {
-      if (process.env.VERCEL) {
-        res.status(503).json({ code: "AUTH_NOT_CONFIGURED", error: "线上身份服务尚未配置，请联系管理员。" });
-        return;
-      }
-      const id = `local-${Buffer.from(input.email).toString("base64url")}`;
-      res.json({ user: { id, email: input.email, username: input.email.split("@")[0] }, token: `local:${id}` });
+      res.status(503).json({ code: "AUTH_NOT_CONFIGURED", error: "线上身份服务尚未配置。" });
       return;
     }
     const { data, error } = await client.auth.signInWithPassword(input);
@@ -82,10 +97,11 @@ authRouter.post("/login", async (req, res) => {
       res.status(422).json({ code: "VALIDATION_ERROR", error: error.issues[0]?.message ?? "输入无效" });
       return;
     }
-    throw error;
+    console.error("Login error:", error);
+    res.status(500).json({ code: "SERVER_ERROR", error: "服务暂时不可用。" });
   }
 });
 
 authRouter.get("/check", (_req, res) => {
-  res.json({ ok: true, provider: isSupabaseConfigured ? "supabase" : "local-development" });
+  res.json({ ok: true, provider: "supabase" });
 });
