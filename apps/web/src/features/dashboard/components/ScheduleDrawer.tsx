@@ -83,6 +83,7 @@ export function ScheduleDrawer({
             <input value={time} onChange={(event) => setTime(event.target.value)} placeholder="如：21:30 - 22:00" className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm outline-none dark:bg-[#171127]" />
             <div className="flex gap-3">
               <Button
+                disabled={!title.trim()}
                 onClick={async () => {
                   if (!title.trim()) return;
                   if (editingId) {
