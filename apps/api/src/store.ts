@@ -282,7 +282,7 @@ export class DemoStore {
       time: "18:30 - 19:00",
       tag: "AI 解析",
       completed: false,
-      source: "parsed",
+      source: "ai" as const,
     })) satisfies DailyTask[];
 
     this.state.dailyPlan = {
@@ -427,9 +427,9 @@ export class DemoStore {
         id: nanoid(),
         title: item.title,
         time: item.time,
-        tag: item.tag,
+        tag: item.tag || "AI 建议",
         completed: false,
-        source: "ai",
+        source: "ai" as const,
       })) satisfies DailyTask[];
       this.state.dailyPlan = {
         ...(this.state.dailyPlan ?? buildDailyPlanFromProfile(this.state.profile as UserProfile)),
