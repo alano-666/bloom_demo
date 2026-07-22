@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { apiClient } from "@/lib-api";
 import { Card } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
-import { RadarChart } from "@/components/RadarChart";
 import { SectionTitle } from "@/components/SectionTitle";
 import { TrendChart } from "@/components/TrendChart";
 import { useBloomStore } from "@/store/useBloomStore";
@@ -29,6 +28,11 @@ export function TrajectoryPage() {
         <MetricCard label="记录天数" value={trajectory.overview.days} hint="本月已记录" />
         <MetricCard label="专注时长" value={`${trajectory.overview.focusHours} h`} hint="累计" />
         <MetricCard label="关键事件" value={trajectory.timeline.length} hint="近期高光" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+        <TrendChart data={trajectory.trend} />
+        <RadarChart data={trajectory.radar} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
