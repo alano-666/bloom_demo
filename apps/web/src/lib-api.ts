@@ -47,6 +47,7 @@ export const apiClient = {
   parseQuickLog: async (content: string) => (await api.post<QuickLogParseResponse>("/events/quick-log/parse", { content })).data,
   getThreads: async () => (await api.get<BootstrapResponse["recentThreads"]>("/session/threads")).data,
   createThread: async (payload: ThreadCreateInput) => (await api.post<CreateThreadResponse>("/session/threads", payload)).data,
+  deleteThread: async (threadId: string) => (await api.delete<{ ok: boolean }>(`/session/threads/${threadId}`)).data,
   getSession: async (threadId: string) => (await api.get<SessionResponse>(`/session/${threadId}`)).data,
   postMessage: async (payload: SessionMessageInput) => (await api.post<PostMessageResponse>("/session/message", payload)).data,
   generateCoreTask: async () => (await api.post<DashboardData["dailyPlan"]>("/dashboard/core-task/generate")).data,

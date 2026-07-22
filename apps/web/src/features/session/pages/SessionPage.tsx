@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AttachmentMeta, SessionMessageInput } from "@bloom/shared";
-import { FileUp, Image, Mic, Plus, SendHorizonal } from "lucide-react";
+import { FileUp, Image, Mic, Plus, SendHorizonal, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib-api";
 import { useBloomStore } from "@/store/useBloomStore";
 import { Card } from "@/components/Card";
@@ -14,6 +14,7 @@ export function SessionPage() {
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
   const [newThreadOpen, setNewThreadOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bootstrap) {
@@ -168,22 +169,54 @@ export function SessionPage() {
           <div className="px-3 pb-3 text-sm font-semibold text-text">全部历史对话</div>
           <div className="space-y-2 xl:max-h-[calc(100%-2.25rem)] xl:overflow-y-auto xl:pr-1">
             {bootstrap?.recentThreads.map((thread) => (
-              <button
-                key={thread.id}
-                onClick={() => {
-                  setActiveThreadId(thread.id);
-                  apiClient.getSession(thread.id).then(setSession);
-                }}
-                className={`interactive w-full rounded-[22px] px-4 py-4 text-left transition ${
-                  activeThread?.id === thread.id ? "bg-primary-50 shadow-soft dark:bg-[#261D46]" : "hover:bg-surface"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-text">{thread.title}</div>
-                  <span className="text-[11px] text-muted">{new Date(thread.lastInputAt ?? thread.updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">{thread.lastInputContent || thread.preview}</p>
-              </button>
+              <div key={thread.id} className="group relative">
+                <button
+                  onClick={() => {
+                    setActiveThreadId(thread.id);
+                    apiClient.getSession(thread.id).then(setSession);
+                  }}
+                  className={`interactive w-full rounded-[22px] px-4 py-4 text-left transition ${
+                    activeThread?.id === thread.id ? "bg-primary-50 shadow-soft dark:bg-[#261D46]" : "hover:bg-surface"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-text">{thread.title}</div>
+                    <span className="text-[11px] text-muted">{new Date(thread.lastInputAt ?? thread.updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">{thread.lastInputContent || thread.preview}</p>
+                </button>
+                <button
+                  className="absolute top-2 right-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 transition"
+                  disabled={deletingThreadId === thread.id}
+                  title="删除此对话"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm("确定要删除这个对话吗? 对话内的所有消息、事件与相关记录将同步清除。")) return;
+                    setDeletingThreadId(thread.id);
+                    try {
+                      await apiClient.deleteThread(thread.id);
+                      const nextBootstrap = await apiClient.getBootstrap();
+                      setBootstrap(nextBootstrap);
+                      if (activeThreadId === thread.id) {
+                        const nextId = nextBootstrap.recentThreads[0]?.id;
+                        if (nextId) {
+                          setActiveThreadId(nextId);
+                          apiClient.getSession(nextId).then(setSession);
+                        } else {
+                          setSession(null as any);
+                          setActiveThreadId(null);
+                        }
+                      }
+                    } catch (error: any) {
+                      window.alert(error?.response?.data?.error ?? "删除失败，请重试。");
+                    } finally {
+                      setDeletingThreadId(null);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         </Card>

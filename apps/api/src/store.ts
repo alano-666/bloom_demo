@@ -168,6 +168,13 @@ export class DemoStore {
     };
   }
 
+  deleteThread(threadId: string) {
+    this.state.threads = this.state.threads.filter((item) => item.id !== threadId);
+    this.state.messages = this.state.messages.filter((message) => message.threadId !== threadId);
+    this.state.events = this.state.events.filter((event) => !event.content.includes(threadId));
+    return { ok: true };
+  }
+
   getSession(threadId: string) {
     const thread = this.state.threads.find((item) => item.id === threadId) ?? this.state.threads[0];
     const messages = this.state.messages.filter((message) => message.threadId === thread.id);

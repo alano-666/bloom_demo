@@ -67,6 +67,7 @@ app.post("/api/events/quick-log", async (req, res) => res.json(await userGrowthS
 app.post("/api/events/quick-log/parse", async (req, res) => res.json(await userGrowthService.parseQuickLog(userId(req), z.object({ content: z.string().min(1) }).parse(req.body).content)));
 app.get("/api/session/threads", async (req, res) => res.json(await userGrowthService.listThreads(userId(req))));
 app.post("/api/session/threads", async (req, res) => res.json(await userGrowthService.createThread(userId(req), z.object({ title: z.string().min(1) }).parse(req.body).title)));
+app.delete("/api/session/threads/:threadId", async (req, res) => res.json(await userGrowthService.deleteThread(userId(req), req.params.threadId)));
 app.get("/api/session/:threadId", async (req, res) => res.json(await userGrowthService.getSession(userId(req), req.params.threadId)));
 app.post("/api/session/message", async (req, res) => {
   const body = z.object({ threadId: z.string().min(1), content: z.string().min(1), attachments: z.array(attachmentSchema).optional() }).parse(req.body);

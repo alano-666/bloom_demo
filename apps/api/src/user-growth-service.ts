@@ -44,6 +44,9 @@ export const userGrowthService = {
   async postMessage(userId: string, input: SessionMessageInput) {
     return mutate(userId, (store) => store.postMessage(input));
   },
+  async deleteThread(userId: string, threadId: string) {
+    return mutate(userId, (store) => store.deleteThread(threadId));
+  },
   async buildTrajectory(userId: string) {
     return (await loadStore(userId)).buildTrajectory();
   },
