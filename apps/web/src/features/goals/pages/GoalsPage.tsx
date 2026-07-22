@@ -27,10 +27,17 @@ export function GoalsPage() {
     if (!draft.title.trim() || !draft.note.trim() || !draft.targetDate.trim() || isSavingGoal) return;
     setIsSavingGoal(true);
     try {
-      const nextGoals = await apiClient.createGoal(draft);
+      const nextGoals = await apiClient.createGoal({
+        title: draft.title.trim(),
+        category: draft.category,
+        targetDate: draft.targetDate,
+        note: draft.note.trim(),
+      });
       updateGoals(nextGoals);
       setCreateOpen(false);
-      setDraft({ title: "", category: "职业", targetDate: "2026-08-20", note: "" });
+      setDraft({ title: "", category: "学习", targetDate: "", note: "" });
+    } catch (error: any) {
+      window.alert(error?.response?.data?.error ?? "保存失败，请重试");
     } finally {
       setIsSavingGoal(false);
     }

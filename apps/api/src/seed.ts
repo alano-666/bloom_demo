@@ -399,6 +399,39 @@ export const categoryKeywords: Record<GrowthDirection, string[]> = {
   生活: ["习惯", "整理", "生活", "家务", "日常", "计划"],
 };
 
+interface RadarDimension {
+  label: string;
+  keywords: string[];
+  baseline: number;
+}
+
+// Dynamically derive radar dimensions from user goals/profile text
+export function deriveRadarDimensions(text: string): RadarDimension[] {
+  const lower = text.toLowerCase();
+  const candidates: RadarDimension[] = [
+    { label: "编程能力", keywords: ["编程", "代码", "开发", "java", "python", "c++", "算法", "数据结构", "debug", "语法", "框架"], baseline: 62 },
+    { label: "后端工程", keywords: ["后端", "spring", "数据库", "mysql", "redis", "api", "rest", "服务器", "部署", "docker", "微服务", "架构", "linux"], baseline: 60 },
+    { label: "学习能力", keywords: ["学习", "课程", "读书", "笔记", "方法", "复盘", "计划", "进度", "节奏"], baseline: 61 },
+    { label: "执行行动", keywords: ["执行", "完成", "推进", "专注", "项目", "练习", "实操", "demo", "动手"], baseline: 59 },
+    { label: "情绪韧性", keywords: ["焦虑", "压力", "情绪", "坚持", "疲惫", "调整", "心态", "稳定"], baseline: 57 },
+    { label: "结构表达", keywords: ["表达", "总结", "结构", "输出", "面试", "文档", "博客", "整理", "复盘"], baseline: 58 },
+    { label: "产品思维", keywords: ["产品", "竞品", "用户", "需求", "体验", "分析", "痛点", "数据", "指标"], baseline: 60 },
+    { label: "健康生活", keywords: ["健康", "运动", "睡眠", "跑步", "饮食", "身体", "精力", "休息"], baseline: 56 },
+    { label: "职业发展", keywords: ["面试", "求职", "offer", "职场", "晋升", "简历", "JD", "岗位", "字节", "大厂"], baseline: 59 },
+    { label: "团队协作", keywords: ["团队", "沟通", "协作", "git", "管理", "leadership", "会议", "汇报"], baseline: 55 },
+    { label: "系统设计", keywords: ["系统设计", "分布式", "高并发", "高可用", "设计模式", "缓存", "消息队列", "架构", "扩展"], baseline: 54 },
+    { label: "数据分析", keywords: ["数据", "分析", "统计", "可视化", "sql", "报表", "实验", "AB"], baseline: 57 },
+  ];
+
+  const scores = candidates.map((dim) => ({
+    dim,
+    score: dim.keywords.filter((kw) => lower.includes(kw)).length * 8 + dim.baseline,
+  }));
+
+  scores.sort((a, b) => b.score - a.score);
+  return scores.slice(0, 5).map((item) => item.dim);
+}
+
 export const replyStylePrompts: Record<ReplyStyle, string> = {
   治愈陪伴: "先共情，再肯定，最后给出柔和但明确的一步行动建议。",
   结构清晰: "用分点和层次表达，结论先行，建议具体可执行。",

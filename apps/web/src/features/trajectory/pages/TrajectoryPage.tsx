@@ -42,10 +42,17 @@ export function TrajectoryPage() {
             <p className="text-sm text-muted">近期养成的习惯</p>
             <h3 className="mt-1 text-lg font-semibold text-text">由近期对话与行动抽取出的稳定习惯</h3>
           </div>
-          <div className="space-y-3">
-            {trajectory.habits.map((habit) => (
-              <div key={habit} className="rounded-[18px] bg-surface/80 px-4 py-4 text-sm text-text dark:bg-[#1B1531]">{habit}</div>
-            ))}
+          <div className="grid gap-3">
+            {trajectory.habits.map((habit, i) => {
+              const colors = ["text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20", "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-900/20", "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20", "text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20"];
+              const color = colors[i % colors.length];
+              return (
+                <div key={habit} className="flex items-center gap-3 rounded-[20px] bg-surface/80 px-5 py-4 text-sm dark:bg-[#1B1531]">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${color}`}>{i + 1}</div>
+                  <span className="font-medium text-text">{habit}</span>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -54,13 +61,24 @@ export function TrajectoryPage() {
             <p className="text-sm text-muted">情绪状态</p>
             <h3 className="mt-1 text-lg font-semibold text-text">基于历史对话识别的情绪标签</h3>
           </div>
-          <div className="space-y-3">
-            {trajectory.emotions.map((emotion) => (
-              <div key={emotion.label} className="flex items-center justify-between rounded-[18px] bg-surface/80 px-4 py-4 text-sm dark:bg-[#1B1531]">
-                <span className="font-medium text-text">{emotion.label}</span>
-                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600">{emotion.count} 次</span>
-              </div>
-            ))}
+          <div className="space-y-4">
+            {trajectory.emotions.map((emotion, i) => {
+              const maxCount = Math.max(...trajectory.emotions.map((e) => e.count), 1);
+              const barPercent = Math.round((emotion.count / maxCount) * 100);
+              const barColors = ["bg-gradient-to-r from-violet-400 to-violet-500", "bg-gradient-to-r from-sky-400 to-sky-500", "bg-gradient-to-r from-amber-400 to-amber-500", "bg-gradient-to-r from-rose-400 to-rose-500"];
+              const barColor = barColors[i % barColors.length];
+              return (
+                <div key={emotion.label}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-text">{emotion.label}</span>
+                    <span className="text-xs font-semibold text-muted">{emotion.count} 次</span>
+                  </div>
+                  <div className="h-3 w-full rounded-full bg-surface/80 dark:bg-[#1B1531] overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${barPercent}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>

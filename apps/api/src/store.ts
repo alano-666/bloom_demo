@@ -27,6 +27,7 @@ import {
   categoryKeywords,
   createInitialState,
   createOnboardingProfile,
+  deriveRadarDimensions,
   reportTemplates,
 } from "./seed.js";
 import { aiProvider } from "./ai/provider.js";
@@ -488,34 +489,16 @@ export class DemoStore {
   }
 
   buildTrajectory(): TrajectoryData {
-    const recentGoalTitles = this.state.goals.slice(0, 5).map((goal) => goal.title + goal.note + goal.category).join(" ");
-    const radar = [
-      {
-        subject: "产品思维",
-        current: this.deriveRadarScore(["产品", "分析", "竞品", "用户"], 62),
-        previous: 58,
-      },
-      {
-        subject: "行动执行",
-        current: this.deriveRadarScore(["执行", "推进", "完成", "专注"], 60),
-        previous: 56,
-      },
-      {
-        subject: "用户洞察",
-        current: this.deriveRadarScore(["用户", "访谈", "痛点", "洞察"], 59),
-        previous: 54,
-      },
-      {
-        subject: "情绪韧性",
-        current: this.deriveRadarScore(["焦虑", "压力", "复盘", "调整"], 57),
-        previous: 52,
-      },
-      {
-        subject: "结构表达",
-        current: this.deriveRadarScore(["表达", "结构", "总结", "结论"], recentGoalTitles.includes("分析") ? 61 : 56),
-        previous: 53,
-      },
-    ];
+    const goalsText = this.state.goals.concat([]).map((goal) => goal.title + goal.note + goal.category).join(" ");
+    const profileMainGoal = (this.state.profile?.mainGoal ?? "") + (this.state.profile?.mainProblem ?? "");
+    const allText = goalsText + profileMainGoal;
+
+    const dims = deriveRadarDimensions(allText);
+    const radar = dims.map((dim) => ({
+      subject: dim.label,
+      current: this.deriveRadarScore(dim.keywords, dim.baseline),
+      previous: Math.max(48, dim.baseline - 4),
+    }));
 
     return {
       tabs: ["本周任务完成趋势", "能力发展", "习惯养成", "情绪状态"],

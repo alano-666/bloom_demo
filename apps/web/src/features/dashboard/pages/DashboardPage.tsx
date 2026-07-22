@@ -21,6 +21,9 @@ export function DashboardPage() {
   const [focusStartedAt, setFocusStartedAt] = useState<number | null>(null);
   const [focusError, setFocusError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [editTaskTitle, setEditTaskTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [editedSubtitle, setEditedSubtitle] = useState("");
   const dashboard = bootstrap?.dashboard;
 
   useEffect(() => {
@@ -145,8 +148,32 @@ export function DashboardPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex rounded-full bg-[#FFF1E8] px-3 py-1 text-xs font-semibold text-[#FF8A4C]">AI 自动生成</div>
-                <h3 className="mt-4 text-[32px] font-semibold tracking-tight text-text">{dashboard.dailyPlan.focusTitle}</h3>
-                <p className="mt-2 text-sm text-muted">{dashboard.dailyPlan.focusSubtitle}</p>
+                {editTaskTitle ? (
+                  <div className="mt-3 space-y-2">
+                    <input value={editedTitle} onChange={(e) => setEditedTitle(e.target.value)} className="w-full text-[24px] font-semibold bg-transparent border-b-2 border-primary-300 outline-none text-text" />
+                    <textarea value={editedSubtitle} onChange={(e) => setEditedSubtitle(e.target.value)} rows={2} className="w-full text-sm bg-transparent border-b-2 border-primary-200 outline-none text-muted resize-none" />
+                    <div className="flex gap-2">
+                      <button
+                        className="rounded-full bg-primary-500 px-4 py-1.5 text-xs font-semibold text-white"
+                        onClick={async () => {
+                          await apiClient.updateProfile({ name: bootstrap?.profile?.name ?? "", username: bootstrap?.profile?.username ?? "", grade: bootstrap?.profile?.grade ?? "", mainGoal: bootstrap?.profile?.mainGoal ?? "", mainProblem: bootstrap?.profile?.mainProblem ?? "" });
+                          const next = await apiClient.getBootstrap();
+                          setBootstrap({ ...next, dashboard: { ...next.dashboard!, dailyPlan: { ...next.dashboard!.dailyPlan, focusTitle: editedTitle, focusSubtitle: editedSubtitle } } });
+                          setEditTaskTitle(false);
+                        }}
+                      >
+                        保存
+                      </button>
+                      <button className="rounded-full bg-surface px-4 py-1.5 text-xs font-semibold text-muted" onClick={() => setEditTaskTitle(false)}>取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="mt-4 text-[32px] font-semibold tracking-tight text-text">{dashboard.dailyPlan.focusTitle}</h3>
+                    <p className="mt-2 text-sm text-muted">{dashboard.dailyPlan.focusSubtitle}</p>
+                    <button className="mt-1 text-xs text-primary-400 underline" onClick={() => { setEditedTitle(dashboard.dailyPlan.focusTitle); setEditedSubtitle(dashboard.dailyPlan.focusSubtitle); setEditTaskTitle(true); }}>编辑任务</button>
+                  </>
+                )}
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-muted">
                   <span>预计耗时 {dashboard.dailyPlan.timeBudgetMinutes} 分钟</span>
                   <span>{dashboard.dailyPlan.deadline}</span>
