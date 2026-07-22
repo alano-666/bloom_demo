@@ -171,7 +171,7 @@ export function DashboardPage() {
                   <>
                     <h3 className="mt-4 text-[32px] font-semibold tracking-tight text-text">{dashboard.dailyPlan.focusTitle}</h3>
                     <p className="mt-2 text-sm text-muted">{dashboard.dailyPlan.focusSubtitle}</p>
-                    <button className="mt-1 text-xs text-primary-400 underline" onClick={() => { setEditedTitle(dashboard.dailyPlan.focusTitle); setEditedSubtitle(dashboard.dailyPlan.focusSubtitle); setEditTaskTitle(true); }}>编辑任务</button>
+                    <button className="mt-1 text-xs text-primary-400 underline" onClick={() => { setEditedTitle(dashboard.dailyPlan.focusTitle); setEditedSubtitle(dashboard.dailyPlan.focusSubtitle); setEditTaskTitle(true); }}>编辑任务标题</button>
                   </>
                 )}
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-muted">
