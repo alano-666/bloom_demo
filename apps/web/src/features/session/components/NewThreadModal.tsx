@@ -11,6 +11,7 @@ export function NewThreadModal({
   onCreate: (title: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState("新的成长会话");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!open) return null;
 
@@ -29,15 +30,17 @@ export function NewThreadModal({
         />
 
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>取消</Button>
           <Button
+            disabled={isSubmitting || !title.trim()}
             onClick={async () => {
-              if (!title.trim()) return;
+              if (!title.trim() || isSubmitting) return;
+              setIsSubmitting(true);
               await onCreate(title.trim());
               onClose();
             }}
           >
-            创建对话
+            {isSubmitting ? "创建中..." : "创建对话"}
           </Button>
         </div>
       </div>

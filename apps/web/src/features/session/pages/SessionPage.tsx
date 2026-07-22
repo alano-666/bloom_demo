@@ -20,12 +20,17 @@ export function SessionPage() {
       apiClient.getBootstrap().then(setBootstrap);
       return;
     }
-    const threadId = activeThreadId ?? bootstrap.recentThreads[0]?.id;
-    if (threadId) {
-      setActiveThreadId(threadId);
-      apiClient.getSession(threadId).then(setSession);
+    if (!activeThreadId) {
+      const firstId = bootstrap.recentThreads[0]?.id;
+      if (firstId) {
+        setActiveThreadId(firstId);
+      }
+      return;
     }
-  }, [activeThreadId, bootstrap, setActiveThreadId, setBootstrap, setSession]);
+    if (!session || session.thread.id !== activeThreadId) {
+      apiClient.getSession(activeThreadId).then(setSession);
+    }
+  }, [activeThreadId, bootstrap, setActiveThreadId, setBootstrap, setSession, session]);
 
   const activeThread = useMemo(
     () => bootstrap?.recentThreads.find((thread) => thread.id === activeThreadId) ?? bootstrap?.recentThreads[0],
