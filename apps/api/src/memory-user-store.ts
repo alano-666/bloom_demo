@@ -1,5 +1,5 @@
 /**
- * In-memory user store — works everywhere (Vercel, Render, local).
+ * In-memory user store — works in Vercel serverless, local dev.
  * No native dependencies. Data is lost on process restart.
  */
 import type { StoredUser } from "./user-store.js";

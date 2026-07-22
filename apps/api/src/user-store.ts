@@ -1,5 +1,5 @@
 /**
- * Abstract user store — SQLite on Render, in-memory Map on Vercel.
+ * Abstract user store — supports in-memory Map on Vercel.
  */
 
 export interface StoredUser {
