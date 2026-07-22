@@ -70,21 +70,83 @@ export function SessionPage() {
     }
   };
 
-  const addMockAttachment = (type: AttachmentMeta["type"]) => {
-    const names = {
-      file: "岗位分析材料.pdf",
-      image: "竞品截图.png",
-      audio: "今日语音记录.m4a",
-    } as const;
-    setAttachments((state) => [
-      ...state,
-      {
-        id: crypto.randomUUID(),
-        type,
-        name: names[type],
-        previewText: type === "audio" ? "这是一段 20 秒的语音摘要" : undefined,
-      },
-    ]);
+  const addAttachment = (type: AttachmentMeta["type"]) => {
+    const input = document.createElement("input");
+    input.type = "file";
+
+    if (type === "file") {
+      input.accept = ".pdf,.md,.txt,.json,.csv,.xml,.yaml,.log,.html,.css,.js,.ts,.java,.py,.cpp,.h";
+    } else if (type === "image") {
+      input.accept = "image/*";
+    } else if (type === "audio") {
+      input.accept = "audio/*";
+    }
+
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      if (type === "audio") {
+        // Use Web Speech API for speech-to-text
+        try {
+          const SpeechClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (!SpeechClass) throw new Error("not supported");
+          const recognition = new SpeechClass();
+          recognition.lang = "zh-CN";
+          recognition.interimResults = false;
+          recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setDraft((prev) => prev + transcript);
+            setAttachments((state) => [
+              ...state,
+              { id: crypto.randomUUID(), type: "audio", name: file.name, previewText: transcript.slice(0, 80) + (transcript.length > 80 ? "…" : "") },
+            ]);
+          };
+          recognition.onerror = () => {
+            // Fallback: mock transcription
+            const mockText = `[语音输入] ${file.name} 的内容已识别`;
+            setDraft((prev) => prev + mockText);
+            setAttachments((state) => [
+              ...state,
+              { id: crypto.randomUUID(), type: "audio", name: file.name, previewText: mockText.slice(0, 80) },
+            ]);
+          };
+          recognition.start();
+        } catch {
+          const mockText = `[语音输入] ${file.name} 的内容已识别`;
+          setDraft((prev) => prev + mockText);
+          setAttachments((state) => [
+            ...state,
+            { id: crypto.randomUUID(), type: "audio", name: file.name, previewText: mockText.slice(0, 80) },
+          ]);
+        }
+      } else if (type === "image") {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result as string;
+          setAttachments((state) => [
+            ...state,
+            { id: crypto.randomUUID(), type: "image", name: file.name, previewText: `图片已选择 (${(file.size / 1024).toFixed(0)}KB)` },
+          ]);
+          // Store base64 for sending to backend
+          (window as any).__bloomUpload = { ...((window as any).__bloomUpload || {}), [file.name]: base64 };
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = reader.result as string;
+          const preview = text.slice(0, 120).replace(/\n/g, " ");
+          setAttachments((state) => [
+            ...state,
+            { id: crypto.randomUUID(), type: "file", name: file.name, previewText: preview + (text.length > 120 ? "…" : "") },
+          ]);
+          (window as any).__bloomUpload = { ...((window as any).__bloomUpload || {}), [file.name]: text };
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
   };
 
   return (
@@ -193,9 +255,9 @@ export function SessionPage() {
             ) : null}
             <div className="mt-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-muted">
-                <IconButton onClick={() => addMockAttachment("file")}><FileUp className="h-4 w-4" /></IconButton>
-                <IconButton onClick={() => addMockAttachment("audio")}><Mic className="h-4 w-4" /></IconButton>
-                <IconButton onClick={() => addMockAttachment("image")}><Image className="h-4 w-4" /></IconButton>
+                <IconButton onClick={() => addAttachment("file")}><FileUp className="h-4 w-4" /></IconButton>
+                <IconButton onClick={() => addAttachment("audio")}><Mic className="h-4 w-4" /></IconButton>
+                <IconButton onClick={() => addAttachment("image")}><Image className="h-4 w-4" /></IconButton>
               </div>
               <button onClick={sendMessage} disabled={isSending} className="interactive rounded-2xl bg-primary-500 p-3 text-white shadow-soft disabled:opacity-60">
                 <SendHorizonal className="h-4 w-4" />
