@@ -168,7 +168,10 @@ export function SessionPage() {
         <Card className="p-4 xl:sticky xl:top-0 xl:h-[calc(100vh-190px)]">
           <div className="px-3 pb-3 text-sm font-semibold text-text">全部历史对话</div>
           <div className="space-y-2 xl:max-h-[calc(100%-2.25rem)] xl:overflow-y-auto xl:pr-1">
-            {bootstrap?.recentThreads.map((thread) => (
+            {(bootstrap?.recentThreads ?? []).length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-muted">暂无对话，点击上方"新建对话"开始。</div>
+            ) : (
+              bootstrap?.recentThreads.map((thread) => (
               <div key={thread.id} className="group relative">
                 <button
                   onClick={() => {
@@ -217,7 +220,9 @@ export function SessionPage() {
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
-            ))}
+            ))
+            )}
+            </div>
           </div>
         </Card>
 
@@ -228,7 +233,10 @@ export function SessionPage() {
           </div>
 
           <div className="flex-1 space-y-5 overflow-y-auto px-2 py-5">
-            {session?.messages.length ? (
+            {!session || !session.messages?.length ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted">这是一个全新的空白对话，开始向 Bloom 说说你的想法吧。</div>
+            ) : (
+              session.messages.map((message) => (
               session.messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[78%] ${message.role === "user" ? "order-2" : "order-1"}`}>
@@ -263,8 +271,6 @@ export function SessionPage() {
                   </div>
                 </div>
               ))
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted">这是一个全新的空白对话，开始向 Bloom 说说你的想法吧。</div>
             )}
           </div>
 
