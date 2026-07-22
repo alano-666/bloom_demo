@@ -22,12 +22,34 @@ export function ScheduleDrawer({
   const [time, setTime] = useState("21:30 - 22:00");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [localTasks, setLocalTasks] = useState<DailyTask[]>(tasks);
+  const [isSaving, setIsSaving] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalTasks(tasks);
   }, [tasks]);
 
   const viewTasks = useMemo(() => localTasks, [localTasks]);
+
+  const handleSave = async () => {
+    if (!title.trim() || isSaving) return;
+    setIsSaving(true);
+    try {
+      if (editingId) {
+        await onUpdate(editingId, title.trim(), time.trim());
+        setLocalTasks((state) => state.map((task) => (task.id === editingId ? { ...task, title: title.trim(), time: time.trim() } : task)));
+        setEditingId(null);
+      } else {
+        await onAdd(title.trim(), time.trim());
+      }
+      setTitle("");
+      setTime("21:30 - 22:00");
+    } catch (error: any) {
+      window.alert("保存失败，请重试");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -83,24 +105,13 @@ export function ScheduleDrawer({
             <input value={time} onChange={(event) => setTime(event.target.value)} placeholder="如：21:30 - 22:00" className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm outline-none dark:bg-[#171127]" />
             <div className="flex gap-3">
               <Button
-                onClick={async () => {
-                  if (!title.trim()) return;
-                  if (editingId) {
-                    await onUpdate(editingId, title.trim(), time.trim());
-                    setLocalTasks((state) => state.map((task) => (task.id === editingId ? { ...task, title: title.trim(), time: time.trim() } : task)));
-                    setEditingId(null);
-                    setTitle("");
-                    setTime("21:30 - 22:00");
-                    return;
-                  }
-                  await onAdd(title.trim(), time.trim());
-                  setTitle("");
-                }}
+                disabled={isSaving || !title.trim()}
+                onClick={handleSave}
               >
-                {editingId ? "保存修改" : "保存日程"}
+                {isSaving ? "保存中..." : editingId ? "保存修改" : "保存日程"}
               </Button>
               {editingId ? (
-                <Button variant="secondary" onClick={() => {
+                <Button variant="secondary" disabled={isSaving} onClick={() => {
                   setEditingId(null);
                   setTitle("");
                   setTime("21:30 - 22:00");
