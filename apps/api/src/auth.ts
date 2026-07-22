@@ -18,48 +18,45 @@ export const authRouter = Router();
 authRouter.post("/register", async (req, res) => {
   try {
     const input = registerSchema.parse(req.body);
+    const adminClient = createSupabaseAdminClient();
     const anonClient = createSupabaseAuthClient();
-    if (!anonClient) {
+    if (!adminClient || !anonClient) {
       res.status(503).json({ code: "AUTH_NOT_CONFIGURED", error: "线上身份服务尚未配置。" });
       return;
     }
 
-    // Register with Supabase Auth using anon key
-    const { data, error } = await anonClient.auth.signUp({
+    // Use admin API to create user (bypasses rate limits, auto-confirms email)
+    const { data: adminUser, error: adminError } = await adminClient.auth.admin.createUser({
       email: input.email,
       password: input.password,
-      options: { data: { username: input.username } },
+      email_confirm: true,
+      user_metadata: { username: input.username },
     });
 
-    // If signUp succeeded but user needs email confirmation, use admin client to confirm immediately
-    if (data?.user && !data.session) {
-      const adminClient = createSupabaseAdminClient();
-      if (adminClient) {
-        await adminClient.auth.admin.updateUserById(data.user.id, { email_confirm: true });
-        // Now sign in to get a session
-        const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
-          email: input.email,
-          password: input.password,
-        });
-        if (signInData?.session) {
-          res.json({
-            user: { id: signInData.user.id, email: signInData.user.email, username: input.username },
-            token: signInData.session.access_token,
-          });
-          return;
-        }
-      }
+    if (adminError || !adminUser?.user) {
+      res.status(400).json({ code: "REGISTER_FAILED", error: adminError?.message ?? "注册失败" });
+      return;
     }
 
-    if (error || !data.user) {
-      res.status(400).json({ code: "REGISTER_FAILED", error: error?.message ?? "注册失败" });
+    // Sign in as the user to get a session token
+    const { data: signInData, error: signInError } = await anonClient.auth.signInWithPassword({
+      email: input.email,
+      password: input.password,
+    });
+
+    if (signInError || !signInData?.session) {
+      // User created but sign-in failed — still return success, frontend will prompt login
+      res.json({
+        user: { id: adminUser.user.id, email: adminUser.user.email, username: input.username },
+        token: null,
+        requiresEmailConfirmation: false,
+      });
       return;
     }
 
     res.json({
-      user: { id: data.user.id, email: data.user.email, username: input.username },
-      token: data.session?.access_token ?? null,
-      requiresEmailConfirmation: !data.session,
+      user: { id: signInData.user.id, email: signInData.user.email, username: input.username },
+      token: signInData.session.access_token,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
