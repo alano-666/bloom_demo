@@ -1,5 +1,6 @@
 import type { ChatReplyResult, CoreTaskResult, ParsedRecordResult, TaskDecompositionResult } from "./types.js";
 import type { PrimaryIntent } from "@bloom/shared";
+import { nanoid } from "nanoid";
 
 function determineCategory(content: string): string {
   if (/运动|睡眠|跑步|饮食|身体|健康|锻炼|健身/.test(content)) return "健康";
@@ -18,11 +19,12 @@ function determineEmotion(content: string): string {
 
 function determineIntent(content: string): PrimaryIntent {
   if (/代码|报错|bug|error|exception|null|编译|运行|语法错误|空指针/.test(content)) return "tech_help";
-  if (/学不动|学不进去|难|慢|好累|坚持不住|焦虑|压力大|崩溃|迷茫/.test(content)) return "emotion_support";
+  if (/学不动|学不进去|好累|坚持不住|焦虑|压力大|崩溃|迷茫/.test(content)) return "emotion_support";
   if (/计划|安排|节奏|进度|学什么|怎么学|接下来|路线|先学/.test(content)) return "study_planning";
   if (/复盘|总结|搞完|做完了|学完了|完成了|帮我梳理/.test(content)) return "review_reflection";
   if (/项目|功能|接口|模块|上线|推进了|跑通|实现了/.test(content)) return "project_progress";
   if (/目标变了|不想继续原来的方向|改一下目标|最近困扰变了/.test(content)) return "goal_shift";
+  if (/困难|瓶颈|不知道怎么|有什么办法|请教|问问|聊天|想分享|心得|感悟|感受|启发/.test(content)) return "light_companion";
   if (/今天|刚刚|下班|去玩|回温|温习|推进|处理了|做了/.test(content)) return "daily_log";
   return "light_companion";
 }
@@ -36,29 +38,6 @@ function extractTopics(content: string): string[] {
   return topics.length ? topics : ["成长记录"];
 }
 
-function inferFollowUp(intent: PrimaryIntent, content: string): string {
-  switch (intent) {
-    case "daily_log":
-      return /项目/.test(content)
-        ? "今天推进项目时，最有成就感的是哪一步？有没有哪个点还卡着？"
-        : "今天最值得记住的一件小进展是什么？";
-    case "project_progress":
-      return "这个项目里下一步最值得继续推进的是哪一块？";
-    case "emotion_support":
-      return "现在最让你难受的，是任务难度本身，还是你对进度的担心？";
-    case "study_planning":
-      return "你更想先补基础稳住心态，还是先做一个小项目保持手感？";
-    case "review_reflection":
-      return "如果只选一件事，你觉得今天最有价值的收获是什么？";
-    case "goal_shift":
-      return "这次目标变化后，你最想先验证的新方向是什么？";
-    case "tech_help":
-      return "这个点你更想先理解原理，还是先解决手头的实际问题？";
-    default:
-      return "如果继续往下聊，你最想接着说今天的哪个部分？";
-  }
-}
-
 export const fallbackAi = {
   chatReply(input: {
     latestMessage: string;
@@ -69,7 +48,7 @@ export const fallbackAi = {
     const category = determineCategory(msg);
     const emotion = determineEmotion(msg);
     const topics = extractTopics(msg);
-    const followUp = inferFollowUp(intent, msg);
+    const followUp = "如果继续往下聊，你最想接着说今天的哪个部分？";
     const hasBlocker = /报错|卡|不会|不懂|难|焦虑|压力/.test(msg);
     const hasProgress = /推进|完成|温习|回温|跑通|实现|学了|做了/.test(msg);
 

@@ -251,19 +251,7 @@ export function SessionPage() {
                     {message.role === "assistant" && message.summary ? (
                       /晚间成长总结/.test(message.content) ? (
                         <EveningSummaryCard content={message.content} />
-                      ) : (
-                        <div className="mt-3 grid gap-3 rounded-[24px] border border-primary-100 bg-primary-50/60 p-4 md:grid-cols-2 dark:border-[#30264D] dark:bg-[#261D46]">
-                          <InfoBlock title="意图识别" text={message.summary.detectedIntent ?? "成长记录"} />
-                          <InfoBlock title="主题提取" text={message.summary.extractedTopic ?? message.summary.memory} />
-                          <InfoBlock title="情绪识别" text={message.summary.emotion} />
-                          <InfoBlock title="进展判断" text={message.summary.progress} />
-                          <InfoBlock title="下一步建议" text={message.summary.nextStep} />
-                          {message.summary.followUpQuestion ? <InfoBlock title="回合追问" text={message.summary.followUpQuestion} /> : null}
-                          {message.summary.detectedIntent && message.summary.followUpQuestion ? <InfoBlock title="等待承接" text="Bloom 已抛出追问，等待你下一轮的回应。" /> : null}
-                          {message.summary.taskSuggestion ? <InfoBlock title="任务建议" text={message.summary.taskSuggestion} /> : null}
-                          {message.summary.scheduleSuggestion ? <InfoBlock title="日程建议" text={message.summary.scheduleSuggestion} /> : null}
-                        </div>
-                      )
+                      ) : null
                     ) : null}
                   </div>
                 </div>
