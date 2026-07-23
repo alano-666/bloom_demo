@@ -53,8 +53,23 @@ export function DashboardPage() {
 
   if (!dashboard) {
     return (
-      <div className="p-10 text-muted">
-        {loadError ? "无法连接后端，个人成长数据尚未加载。请稍后刷新重试。" : "正在加载 Bloom 仪表盘…"}
+      <div className="flex items-center justify-center p-10">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />
+          <p className="mt-4 text-sm text-muted">
+            {loadError
+              ? "无法连接后端，个人成长数据尚未加载。请刷新页面或检查网络。"
+              : "正在加载 Bloom 仪表盘…"}
+          </p>
+          {loadError ? (
+            <button
+              className="mt-4 rounded-full bg-primary-500 px-5 py-2 text-sm font-semibold text-white shadow-soft hover:bg-primary-600 transition"
+              onClick={() => window.location.reload()}
+            >
+              刷新页面
+            </button>
+          ) : null}
+        </div>
       </div>
     );
   }

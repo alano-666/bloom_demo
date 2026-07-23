@@ -66,7 +66,7 @@ export function AuthPage() {
       if (data?.error) {
         setError({ message: data.error, code: data.code, lockedUntil: data.lockedUntil });
       } else if (err?.code === "ECONNABORTED" || !err?.response) {
-        setError({ message: "后端服务暂时无法连接，请稍后重试。" });
+        setError({ message: "后端服务暂时无法连接。请确认浏览器可以访问 bloom-demo-api.vercel.app，或检查梯子是否开启。" });
       } else {
         setError({ message: "登录失败，请检查网络连接。" });
       }
@@ -122,7 +122,7 @@ export function AuthPage() {
       if (data?.error) {
         setError({ message: data.error, code: data.code });
       } else if (err?.code === "ECONNABORTED" || !err?.response) {
-        setError({ message: "后端服务暂时无法连接，注册信息尚未保存，请稍后重试。" });
+        setError({ message: "后端服务暂时无法连接。请确认浏览器可以访问 bloom-demo-api.vercel.app，或检查梯子是否开启。" });
       } else {
         setError({ message: "注册失败，请检查网络连接。" });
       }
