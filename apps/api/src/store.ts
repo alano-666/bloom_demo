@@ -385,6 +385,31 @@ export class DemoStore {
     return this.buildDashboard();
   }
 
+  private getLatestPendingFollowUp(threadId: string) {
+    const threadExtractions = this.state.extractions
+      .filter((item) => item.threadId === threadId)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return threadExtractions.find((item) => item.turnStage === "follow_up_waiting" && !item.followUpAnswered) ?? null;
+  }
+
+  private markFollowUpResolved(threadId: string, messageContent: string) {
+    const pending = this.getLatestPendingFollowUp(threadId);
+    if (!pending) return null;
+
+    const answered = messageContent.length >= 8 || /是|不是|因为|我觉得|主要|今天|刚刚|项目|语法|报错|完成|推进/.test(messageContent);
+    if (!answered) return pending;
+
+    const idx = this.state.extractions.findIndex((item) => item.id === pending.id);
+    if (idx >= 0) {
+      this.state.extractions[idx] = {
+        ...this.state.extractions[idx],
+        turnStage: "resolved",
+        followUpAnswered: true,
+      };
+    }
+    return this.state.extractions[idx] ?? pending;
+  }
+
   async postMessage(input: SessionMessageInput): Promise<PostMessageResponse> {
     const userMessage: Message = {
       id: nanoid(),
@@ -396,6 +421,12 @@ export class DemoStore {
     };
 
     const thread = this.state.threads.find((item) => item.id === input.threadId) ?? this.state.threads[0];
+    const previousFollowUp = this.markFollowUpResolved(input.threadId, input.content);
+    const previousSummary = previousFollowUp
+      ? `（用户在上一条成长记录里提到了「${previousFollowUp.topics.join("、")}」，目前正在回应追问之中。）`
+      : undefined;
+    const isAnsweringFollowUp = Boolean(previousFollowUp);
+
     const result = await aiProvider.chatReply({
       user: this.buildAiUserContext(),
       thread: {
@@ -434,6 +465,8 @@ export class DemoStore {
           hasProgress: /推进|完成|学|做|实现|跑通/.test(input.content),
           hasBlocker: Boolean(result.summary.hasBlocker),
           hasGoalChange: false,
+          turnStage: (result.summary.followUpQuestion ? "follow_up_waiting" : "resolved") as import("@bloom/shared").TurnStage,
+          followUpAnswered: isAnsweringFollowUp,
           progressSummary: result.summary.progress,
           blockerSummary: result.summary.hasBlocker ? result.summary.nextStep : undefined,
           reflectionSummary: /今天|刚刚|复盘|总结/.test(input.content) ? result.summary.progress : undefined,

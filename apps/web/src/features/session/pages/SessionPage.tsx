@@ -259,6 +259,7 @@ export function SessionPage() {
                           <InfoBlock title="进展判断" text={message.summary.progress} />
                           <InfoBlock title="下一步建议" text={message.summary.nextStep} />
                           {message.summary.followUpQuestion ? <InfoBlock title="回合追问" text={message.summary.followUpQuestion} /> : null}
+                          {message.summary.detectedIntent && message.summary.followUpQuestion ? <InfoBlock title="等待承接" text="Bloom 已抛出追问，等待你下一轮的回应。" /> : null}
                           {message.summary.taskSuggestion ? <InfoBlock title="任务建议" text={message.summary.taskSuggestion} /> : null}
                           {message.summary.scheduleSuggestion ? <InfoBlock title="日程建议" text={message.summary.scheduleSuggestion} /> : null}
                         </div>

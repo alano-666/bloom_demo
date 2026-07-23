@@ -82,6 +82,8 @@ export const fallbackAi = {
       hasProgress,
       hasBlocker,
       hasGoalChange: intent === "goal_shift",
+      turnStage: (followUp ? "follow_up_waiting" : "resolved") as import("@bloom/shared").TurnStage,
+      followUpAnswered: false,
       progressSummary: hasProgress ? `提到了 ${topics.join("、")} 的推进` : undefined,
       blockerSummary: hasBlocker ? "存在卡点或压力信号" : undefined,
       reflectionSummary: intent === "review_reflection" || intent === "daily_log" ? "包含当日记录/复盘信息" : undefined,

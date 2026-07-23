@@ -16,6 +16,8 @@ export type PrimaryIntent =
   | "goal_shift"
   | "light_companion";
 
+export type TurnStage = "user_input" | "assistant_response" | "follow_up_waiting" | "resolved";
+
 export interface UserProfile {
   completed: boolean;
   name: string;
@@ -105,6 +107,8 @@ export interface ConversationExtraction {
   hasProgress: boolean;
   hasBlocker: boolean;
   hasGoalChange: boolean;
+  turnStage: TurnStage;
+  followUpAnswered: boolean;
   progressSummary?: string;
   blockerSummary?: string;
   reflectionSummary?: string;
