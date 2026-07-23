@@ -26,6 +26,10 @@
 4. 聚合出 Dashboard / Trajectory / Report 所需数据
 5. 把结果统一返回前端展示
 
+新增两项已落地职责：
+6. 记录用户 `mainGoal / mainProblem` 的历史变化，用于季报/年报展示方向变化
+7. 在晚间复盘时间生成“晚间成长总结”消息，沉淀到专门线程中，体现长期陪伴价值
+
 ---
 
 ## 3. 核心数据模型
@@ -46,6 +50,7 @@
 - AI 回复上下文
 - 报告总结
 - 目标优先级判断
+- 晚间总结生成时的个性化称呼与追问方向
 
 ---
 
@@ -70,6 +75,10 @@
 用途：
 - 作为最重要的原始输入源
 - 支撑对话列表、会话详情、AI 记忆回调
+- 作为晚间总结的“今日对话素材”
+
+新增线程约定：
+- `thread-evening-summary`：晚间成长总结线程，后端每天生成总结时写入该线程
 
 ---
 
@@ -97,7 +106,25 @@
 
 ---
 
-### 3.4 成长事件 `GrowthEvent`
+### 3.4 目标历史 `GoalHistoryEntry`
+当用户在个人信息里修改近期目标或当前困扰时，系统记录一条历史。
+
+字段：
+- `id`
+- `timestamp`
+- `previousGoal`
+- `newGoal`
+- `previousProblem`
+- `newProblem`
+
+用途：
+- 季报 / 年报中展示“目标方向调整”
+- 统计用户目标迭代次数
+- 体现长期成长中的方向校准能力
+
+---
+
+### 3.5 成长事件 `GrowthEvent`
 每次重要输入、目标推进、专注结束，最终都会沉淀成标准事件。
 
 关键字段：
@@ -116,10 +143,14 @@
 - 报告亮点
 - 关键事件判定
 - Dashboard 状态推导
+- 晚间总结的数据来源
+
+补充来源：
+- `evening-summary`：晚间总结消息本身可视为一种特殊成长事件来源（当前实现为消息写入，后续可扩展为独立 event）
 
 ---
 
-### 3.5 今日任务与日程 `DailyPlan` / `DailyTask`
+### 3.6 今日任务与日程 `DailyPlan` / `DailyTask`
 #### DailyPlan
 - `focusTitle`
 - `focusSubtitle`
@@ -135,15 +166,16 @@
 - `time`
 - `tag`
 - `completed`
-- `source`（`manual` / `ai` / `parsed`）
+- `source`（`manual` / `ai`）
 
 用途：
 - 今日成长页的核心任务和日程安排
 - 区分用户手动添加和 AI 解析来源
+- 晚间总结中展示今日核心任务与完成进度
 
 ---
 
-### 3.6 每日指标快照 `MetricSnapshot`
+### 3.7 每日指标快照 `MetricSnapshot`
 这是所有可视化与指标聚合的核心来源。
 
 字段：
@@ -159,6 +191,7 @@
 - 本周成长曲线
 - 周/月/季/年报告统计
 - streak / active days / delta 计算
+- 晚间总结中展示“今日成长值变化 / 主情绪 / 专注时长”
 
 ---
 
@@ -173,6 +206,8 @@
 - **GrowthEvent → Trajectory / Report**：用于关键事件、习惯、情绪、亮点生成
 - **GoalProgressLog → GrowthEvent**：手动目标推进会反向生成成长事件
 - **DailyTask** 可来自 AI 或用户手动添加，并与事件/目标形成上下文关系
+- **GoalHistoryEntry → Report**：目标变化会在季报/年报中作为 highlight 与 stats 展示
+- **Today(Messages + Events + Metrics + DailyPlan) → Evening Summary**：每天晚间从这四类数据聚合出一条总结消息写入 thread-evening-summary
 
 ---
 
@@ -292,218 +327,44 @@ delta = avg(recent 7 days growthScore) - avg(previous 7 days growthScore)
 - 较高进度目标数量权重
 
 当前维度：
-- 产品思维
-- 行动执行
-- 用户洞察
-- 情绪韧性
-- 结构表达
+- 不再固定为产品经理词汇
+- 根据用户目标/困扰文本动态推导，如：编程能力 / 后端工程 / 学习能力 / 执行行动 / 情绪韧性 / 健康生活 等
 
 ---
 
-## 5.10 习惯 `habits`
+## 5.10 晚间总结 `eveningSummary()`
 ### 当前规则
-从事件与消息中提取重复模式：
-- 复盘相关行为
-- 固定专注行为
-- 健康类行为
-- 整理/计划类表达
+每晚通过前端定时器触发 `POST /api/session/evening-summary`，后端即时生成总结：
 
-输出示例：
-- 连续记录每日复盘
-- 固定进行专注时段
-- 每周保持运动节奏
-- 睡前整理第二天重点
+输入来源：
+- 今日 `messages`
+- 今日 `events`
+- 今日 `dailyPlan`
+- 最新 `MetricSnapshot`
+
+输出结构：
+- 今日核心任务与进度
+- 今日专注时长与成长值变化
+- 今日主情绪
+- 一条轻量追问（根据今日消息内容生成）
+
+线程规则：
+- 自动创建 / 复用 `thread-evening-summary`
+- 消息写入 `messages`，并更新 thread preview/updatedAt
 
 ---
 
-## 5.11 关键事件 `keyEvents`
+## 5.11 目标历史在报告中的体现
 ### 当前规则
-每条事件会计算关键性权重，来源包括：
-- `scoreDelta`
-- 关键关键词命中：
-  - 面试
-  - offer
-  - 决定
-  - 突破
-  - 复盘
-  - 完成
-- 命中目标数量
-- 情绪波动（积极/焦虑额外加权）
-
-当权重大于等于阈值时，事件会进入：
-- 周期报告 highlights
-- 轨迹页关键时刻回顾
-
----
-
-## 5.12 报告 `Report`
-### 当前生成逻辑
-- `stats`：来自 `MetricSnapshot` / `Goal` / 虚拟睡眠数据聚合
-- `highlights`：来自 `keyEvents`
-- `title` / `summary` / `nextSuggestion`：当前为**规则主导**，后续可升级为“结构化数据 + AI 生成 + fallback”
-
-当前动态依赖：
-- `dominantEmotion`
-- `recordDays`
-- `totalFocusHours`
-- `completedGoals`
-- `keyEvents`
-
----
-
-## 6. AI Provider 逻辑
-
-### 当前优先级
-1. **阿里百炼 Bailian**
-2. 智谱 AI Zhipu
-3. fallback 规则逻辑
-
-### 当前已接入能力
-- 成长对话回复
-- 今日核心任务生成
-- 任务拆解
-- 输入记录解析
-
-### 当前可升级能力
-- 报告文案总结
-- 关键事件摘要增强
-- 更强的任务规划与日程编排
-
----
-
-## 7. 数据流走向
-
-## 7.1 用户发送成长对话时
-```mermaid
-flowchart TD
-    A[用户输入消息] --> B[写入 Message]
-    B --> C[调用 AI Provider / fallback]
-    C --> D[生成 AI 回复]
-    C --> E[提炼 category / emotion / taskSuggestion / scheduleSuggestion]
-    E --> F[生成 GrowthEvent]
-    F --> G[更新 Goal 进度]
-    F --> H[更新 MetricSnapshot]
-    E --> I[生成/补充 DailyTask]
-    G --> J[刷新 Dashboard]
-    H --> J
-    I --> J
-    F --> K[刷新 Trajectory]
-    F --> L[刷新 Report]
-    D --> M[返回 SessionResponse + Dashboard + Goals + Trajectory + Report]
+在 `buildReport("quarter" | "year")` 中：
+- 若 `goalHistory` 非空，取最近 1~3 条变化
+- 追加一条 `highlights`：
+  - 标题：`目标方向调整`
+  - 摘要：`从「旧目标」→「新目标」`
+- 若变更次数 >= 2：
+  - `title` 改为“在持续校准中找到更清晰的方向”
+  - `nextSuggestion` 增强为“建议将当前方向沉淀为可量化的里程碑”
+- 在 `stats` 中增加：
+```text
+{ label: "目标迭代", value: "N 次", hint: "持续校准方向" }
 ```
-
----
-
-## 7.2 用户进行专注时
-```mermaid
-flowchart TD
-    A[点击开始专注] --> B[前端倒计时]
-    B --> C{暂停 or 结束任务}
-    C -->|暂停| D[按专注分钟数更新任务进度]
-    C -->|结束任务| E[任务进度=100%]
-    D --> F[生成 focus 类型 GrowthEvent]
-    E --> F
-    F --> G[更新 MetricSnapshot.focusHours]
-    F --> H[更新 growthScore]
-    G --> I[刷新 Dashboard / Trajectory / Report]
-    H --> I
-```
-
----
-
-## 7.3 用户新增目标 / 标记进展时
-```mermaid
-flowchart TD
-    A[用户创建 Goal] --> B[写入 Goal]
-    B --> C[更新 Goals 列表]
-
-    D[用户标记新进展] --> E[写入 GoalProgressLog]
-    E --> F[生成 GrowthEvent]
-    F --> G[更新 Goal.progress]
-    F --> H[更新 MetricSnapshot]
-    G --> I[刷新 Goals / Dashboard / Trajectory / Report]
-    H --> I
-```
-
----
-
-## 8. 数据关系思维导图
-```mermaid
-mindmap
-  root((Bloom 后端状态引擎))
-    用户画像
-      UserProfile
-      mainGoal
-      mainProblem
-      grade
-    原始输入
-      ConversationThread
-      Message
-      AttachmentMeta
-    标准事件
-      GrowthEvent
-      category
-      emotion
-      scoreDelta
-      focusMinutes
-    目标体系
-      Goal
-      GoalProgressLog
-      progress
-      streak
-    今日任务
-      DailyPlan
-      DailyTask
-      AI解析
-      手动添加
-    指标聚合
-      MetricSnapshot
-      growthScore
-      focusHours
-      moodScore
-      checkins
-    输出页面
-      Dashboard
-      Trajectory
-      Report
-      Goals
-```
-
----
-
-## 9. 当前实现状态说明
-
-### 已经真实动态化的部分
-- 对话驱动 AI 回复
-- 对话驱动情绪识别
-- 对话驱动成长值变化
-- 对话驱动日程建议
-- 专注时长累计
-- streak / activeDays
-- 关键事件筛选
-- 雷达图 current 值
-- 报告亮点
-- Dashboard 提醒
-- 阿里百炼真实接管 AI Provider
-
-### 仍然是 Demo/虚拟占位的部分
-- 屏幕时长
-- 睡眠时长
-- 健康接口
-- 小红书检索
-- RAG 数据库
-- 生产级持久化存储
-
----
-
-## 10. 后续推荐演进方向
-1. 把 `title / summary / nextSuggestion` 升级成“结构化数据 + AI 生成 + fallback”
-2. 增加真正的 `ConversationExtraction` / `MemoryFact` 结构
-3. 将 `MetricSnapshot` 升级为更明确的 `DailyAggregate`
-4. 引入数据库持久化，替代当前内存 store
-5. 为未来原生端接入 Apple 健康 / 屏幕使用时间预留数据同步接口
-
----
-
-## 11. 一句话总结
-Bloom 当前后端已经从“前端展示的假数据源”演进成一个**围绕成长对话更新事件、目标、指标、轨迹与报告的状态引擎**；所有核心展示数据已经逐步具备可解释的来源与计算路径。

@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { SectionTitle } from "@/components/SectionTitle";
 import { NewThreadModal } from "@/features/session/components/NewThreadModal";
 import { IconButton } from "@/components/IconButton";
+import { EveningSummaryCard } from "@/features/session/components/EveningSummaryCard";
 
 export function SessionPage() {
   const { bootstrap, session, activeThreadId, setActiveThreadId, setSession, mergeFromMessage, setCreatedThread, setBootstrap } = useBloomStore();
@@ -17,21 +18,18 @@ export function SessionPage() {
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!bootstrap) {
-      apiClient.getBootstrap().then(setBootstrap);
-      return;
-    }
-    if (!activeThreadId) {
-      const firstId = bootstrap.recentThreads[0]?.id;
-      if (firstId) {
-        setActiveThreadId(firstId);
-      }
-      return;
-    }
-    if (!session || session.thread.id !== activeThreadId) {
-      apiClient.getSession(activeThreadId).then(setSession);
-    }
-  }, [activeThreadId, bootstrap, setActiveThreadId, setBootstrap, setSession, session]);
+    if (!bootstrap || !activeThreadId || activeThreadId !== "thread-evening-summary") return;
+    if (session?.thread.id === "thread-evening-summary" && session.messages?.length) return;
+    apiClient.eveningSummary()
+      .then((result) => {
+        setSession(result.session);
+        setActiveThreadId(result.threadId);
+      })
+      .catch(() => {
+        // keep session page usable even if nightly summary generation fails
+      });
+  }, [bootstrap, activeThreadId, session, setSession, setActiveThreadId]);
+
 
   const activeThread = useMemo(
     () => bootstrap?.recentThreads.find((thread) => thread.id === activeThreadId) ?? bootstrap?.recentThreads[0],
@@ -251,14 +249,18 @@ export function SessionPage() {
                       </div>
                     ) : null}
                     {message.role === "assistant" && message.summary ? (
-                      <div className="mt-3 grid gap-3 rounded-[24px] border border-primary-100 bg-primary-50/60 p-4 md:grid-cols-2 dark:border-[#30264D] dark:bg-[#261D46]">
-                        <InfoBlock title="记忆回调" text={message.summary.memory} />
-                        <InfoBlock title="情绪识别" text={message.summary.emotion} />
-                        <InfoBlock title="进展判断" text={message.summary.progress} />
-                        <InfoBlock title="下一步建议" text={message.summary.nextStep} />
-                        {message.summary.taskSuggestion ? <InfoBlock title="任务建议" text={message.summary.taskSuggestion} /> : null}
-                        {message.summary.scheduleSuggestion ? <InfoBlock title="日程建议" text={message.summary.scheduleSuggestion} /> : null}
-                      </div>
+                      /晚间成长总结/.test(message.content) ? (
+                        <EveningSummaryCard content={message.content} />
+                      ) : (
+                        <div className="mt-3 grid gap-3 rounded-[24px] border border-primary-100 bg-primary-50/60 p-4 md:grid-cols-2 dark:border-[#30264D] dark:bg-[#261D46]">
+                          <InfoBlock title="记忆回调" text={message.summary.memory} />
+                          <InfoBlock title="情绪识别" text={message.summary.emotion} />
+                          <InfoBlock title="进展判断" text={message.summary.progress} />
+                          <InfoBlock title="下一步建议" text={message.summary.nextStep} />
+                          {message.summary.taskSuggestion ? <InfoBlock title="任务建议" text={message.summary.taskSuggestion} /> : null}
+                          {message.summary.scheduleSuggestion ? <InfoBlock title="日程建议" text={message.summary.scheduleSuggestion} /> : null}
+                        </div>
+                      )
                     ) : null}
                   </div>
                 </div>
