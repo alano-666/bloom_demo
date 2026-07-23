@@ -6,6 +6,15 @@ export type MessageRole = "user" | "assistant";
 export type ReportPeriod = "week" | "month" | "quarter" | "year";
 export type ReplyStyle = "治愈陪伴" | "结构清晰" | "精准鼓励";
 export type AttachmentType = "file" | "image" | "audio";
+export type PrimaryIntent =
+  | "daily_log"
+  | "tech_help"
+  | "study_planning"
+  | "emotion_support"
+  | "review_reflection"
+  | "project_progress"
+  | "goal_shift"
+  | "light_companion";
 
 export interface UserProfile {
   completed: boolean;
@@ -77,6 +86,31 @@ export interface MessageSummary {
   nextStep: string;
   taskSuggestion?: string;
   scheduleSuggestion?: string;
+  detectedIntent?: PrimaryIntent;
+  extractedTopic?: string;
+  followUpQuestion?: string;
+  hasBlocker?: boolean;
+}
+
+export interface ConversationExtraction {
+  id: string;
+  threadId: string;
+  messageId: string;
+  createdAt: string;
+  primaryIntent: PrimaryIntent;
+  secondaryIntent?: string;
+  confidence: number;
+  topics: string[];
+  emotion: Emotion;
+  hasProgress: boolean;
+  hasBlocker: boolean;
+  hasGoalChange: boolean;
+  progressSummary?: string;
+  blockerSummary?: string;
+  reflectionSummary?: string;
+  mentionedGoal?: string;
+  mentionedProblem?: string;
+  suggestedFollowUp?: string;
 }
 
 export interface Message {
@@ -272,6 +306,7 @@ export interface DemoState {
   events: GrowthEvent[];
   threads: ConversationThread[];
   messages: Message[];
+  extractions: ConversationExtraction[];
   dailyPlan: DailyPlan | null;
   metrics: MetricSnapshot[];
   settings: UserSettings;

@@ -251,6 +251,7 @@ export const createEmptyState = (): DemoState => ({
   events: [],
   threads: [],
   messages: [],
+  extractions: [],
   dailyPlan: null,
   metrics: [],
   settings: structuredClone(defaultSettings),
@@ -264,6 +265,7 @@ export const createInitialState = (): DemoState => ({
   events: structuredClone(events),
   threads: structuredClone(threads),
   messages: structuredClone(messages),
+  extractions: [],
   dailyPlan: structuredClone(dailyPlan),
   metrics: structuredClone(normalizedMetrics),
   settings: {

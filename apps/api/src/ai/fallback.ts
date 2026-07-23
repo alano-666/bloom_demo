@@ -1,8 +1,9 @@
 import type { ChatReplyResult, CoreTaskResult, ParsedRecordResult, TaskDecompositionResult } from "./types.js";
+import type { PrimaryIntent } from "@bloom/shared";
 
 function determineCategory(content: string): string {
   if (/运动|睡眠|跑步|饮食|身体|健康|锻炼|健身/.test(content)) return "健康";
-  if (/学习|课程|读书|笔记|方法|教程|看书|视频|资料|文档/.test(content)) return "学习";
+  if (/学习|课程|读书|笔记|方法|教程|看书|视频|资料|文档|语法|集合|接口|抽象类|异常|java|python|c\+\+|后端/.test(content)) return "学习";
   if (/生活|习惯|日常|计划|复盘|整理/.test(content)) return "生活";
   if (/焦虑|压力|紧张|迷茫|情绪|没动力|难过|累|烦/.test(content)) return "情绪";
   return "职业";
@@ -11,8 +12,51 @@ function determineCategory(content: string): string {
 function determineEmotion(content: string): string {
   if (/焦虑|压力|紧张|急|慌|崩/.test(content)) return "anxious";
   if (/累|困|没动力|疲惫|乏|拖延|不想/.test(content)) return "tired";
-  if (/完成|进展|顺利|不错|搞定|好了|学会|开心/.test(content)) return "positive";
+  if (/完成|进展|顺利|不错|搞定|好了|学会|开心|去玩|放松/.test(content)) return "positive";
   return "steady";
+}
+
+function determineIntent(content: string): PrimaryIntent {
+  if (/代码|报错|bug|error|exception|null|编译|运行|语法错误|空指针/.test(content)) return "tech_help";
+  if (/学不动|学不进去|难|慢|好累|坚持不住|焦虑|压力大|崩溃|迷茫/.test(content)) return "emotion_support";
+  if (/计划|安排|节奏|进度|学什么|怎么学|接下来|路线|先学/.test(content)) return "study_planning";
+  if (/复盘|总结|搞完|做完了|学完了|完成了|帮我梳理/.test(content)) return "review_reflection";
+  if (/项目|功能|接口|模块|上线|推进了|跑通|实现了/.test(content)) return "project_progress";
+  if (/目标变了|不想继续原来的方向|改一下目标|最近困扰变了/.test(content)) return "goal_shift";
+  if (/今天|刚刚|下班|去玩|回温|温习|推进|处理了|做了/.test(content)) return "daily_log";
+  return "light_companion";
+}
+
+function extractTopics(content: string): string[] {
+  const topics: string[] = [];
+  if (/Java|java|语法|集合|接口|抽象类|异常/.test(content)) topics.push("Java基础");
+  if (/AI项目|AI|项目|接口|功能|模块/.test(content)) topics.push("AI项目");
+  if (/后端|Spring|数据库|MySQL|Redis/.test(content)) topics.push("后端开发");
+  if (/情绪|焦虑|压力|放松|去玩|休息/.test(content)) topics.push("情绪状态");
+  return topics.length ? topics : ["成长记录"];
+}
+
+function inferFollowUp(intent: PrimaryIntent, content: string): string {
+  switch (intent) {
+    case "daily_log":
+      return /项目/.test(content)
+        ? "今天推进项目时，最有成就感的是哪一步？有没有哪个点还卡着？"
+        : "今天最值得记住的一件小进展是什么？";
+    case "project_progress":
+      return "这个项目里下一步最值得继续推进的是哪一块？";
+    case "emotion_support":
+      return "现在最让你难受的，是任务难度本身，还是你对进度的担心？";
+    case "study_planning":
+      return "你更想先补基础稳住心态，还是先做一个小项目保持手感？";
+    case "review_reflection":
+      return "如果只选一件事，你觉得今天最有价值的收获是什么？";
+    case "goal_shift":
+      return "这次目标变化后，你最想先验证的新方向是什么？";
+    case "tech_help":
+      return "这个点你更想先理解原理，还是先解决手头的实际问题？";
+    default:
+      return "如果继续往下聊，你最想接着说今天的哪个部分？";
+  }
 }
 
 export const fallbackAi = {
@@ -21,85 +65,170 @@ export const fallbackAi = {
     user: { mainGoal: string; mainProblem: string; replyStyle: string };
   }): ChatReplyResult {
     const msg = input.latestMessage;
-    const domain = determineCategory(msg);
+    const intent = determineIntent(msg);
+    const category = determineCategory(msg);
+    const emotion = determineEmotion(msg);
+    const topics = extractTopics(msg);
+    const followUp = inferFollowUp(intent, msg);
+    const hasBlocker = /报错|卡|不会|不懂|难|焦虑|压力/.test(msg);
+    const hasProgress = /推进|完成|温习|回温|跑通|实现|学了|做了/.test(msg);
 
-    if (/代码|报错|bug|error|exception|null|编译|运行|语法/.test(msg)) {
+    const extraction = {
+      primaryIntent: intent,
+      secondaryIntent: intent === "daily_log" && /项目/.test(msg) ? "project_progress" : undefined,
+      confidence: 0.82,
+      topics,
+      emotion: (emotion === "positive" ? "positive" : emotion === "anxious" ? "anxious" : emotion === "tired" ? "tired" : "steady") as any,
+      hasProgress,
+      hasBlocker,
+      hasGoalChange: intent === "goal_shift",
+      progressSummary: hasProgress ? `提到了 ${topics.join("、")} 的推进` : undefined,
+      blockerSummary: hasBlocker ? "存在卡点或压力信号" : undefined,
+      reflectionSummary: intent === "review_reflection" || intent === "daily_log" ? "包含当日记录/复盘信息" : undefined,
+      mentionedGoal: intent === "goal_shift" ? msg : undefined,
+      mentionedProblem: hasBlocker ? msg : undefined,
+      suggestedFollowUp: followUp,
+    };
+
+    if (intent === "daily_log") {
       return {
-        reply: "这是 NullPointerException 空指针异常, Java 最高频的报错之一.\n\n根因: Java 的 String / 对象是引用类型, 当变量为 null 时调用方法就会触发空指针. 这和 Python 里 None 拼接字符串直接转字符串的逻辑完全不同, 是从 Python / C++ 转到 Java 很容易踩的坑.\n\n修正:\n1. 先做非空判断 -- if (obj != null) 是最直接的防护\n2. 也可以用 Objects.toString(obj) 兜底\n3. 写后端代码时, 包装类, 集合调用方法前都要判空 -- 空指针是后端 Top1 异常\n\n排查口诀: 看到 NullPointer, 先找报错行里所有点操作的对象, 哪个是 null 就修哪个.",
-        emotion: "报错不是坏事, 每次 Debug 都是加深理解的机会.",
-        progress: "排查这类报错本身就是后端开发的必经之路, 解决一次以后就能秒定位.",
-        nextStep: "按上面的思路修改代码后重新运行, 看是否还有同类报错.",
-        taskSuggestion: "把修正后的代码写好, 跑通后记下这次错误类型和排查思路.",
-        scheduleSuggestion: "建议今晚预留 30 分钟低打扰时间来推进这件事",
-        category: "学习",
-        suggestedMetric: "中",
+        reply: "今天其实过得挺扎实的。你一边回温了基础内容，一边还在推进自己的项目，这说明你不是只停留在学概念，而是在把知识往真实产出上接。" +
+          "\n\n如果把今天拆开看：\n- 回温基础，是在稳住底层能力\n- 推进项目，是在把能力往实战里落\n- 下班去玩，也是在给自己留恢复空间，这对长期坚持很重要。" +
+          "\n\n我更想追问一句：" + followUp,
+        emotion: emotion === "positive" ? "今天整体状态偏积极，也有一点完成后的放松感。" : "你的状态总体平稳，今天有真实推进。",
+        progress: hasProgress ? `今天的输入里同时包含了「${topics.join(" / ")}」的推进信号。` : `今天的记录和长期目标「${input.user.mainGoal}」是相关的。`,
+        nextStep: "把今天最值得记住的一步记录下来，明天就更容易接着往前走。",
+        taskSuggestion: /项目/.test(msg) ? "把今天推进项目中最关键的一步记录下来。" : "把今天学到的一个核心点写成 3 句话复盘。",
+        scheduleSuggestion: "明天预留 20~30 分钟，先从今天最顺手的那一小步重新启动。",
+        category,
+        suggestedMetric: hasProgress ? "高" : "中",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker,
+        extraction,
       };
     }
 
-    if (/学不动|学不进去|难|慢|好累|坚持|不行了|焦虑|压力大|崩溃/.test(msg)) {
+    if (intent === "project_progress") {
       return {
-        reply: "太正常了, 高强度技术学习和反复调试本身就极耗心力, 脑子过载完全是生理反应, 不是你学不会.\n\n不用硬撑, 给你两个方向选一个: 要么现在停 20 分钟站起来走两步, 喝水听点轻松的; 要么换一个比当前任务轻很多的小动作 -- 比如写几行简单的 Demo, 用代码手感把状态拉回来.\n\n进度快慢完全没关系, 我们是长期补栈, 不是冲刺. 我全程在, 任何时候你想继续了, 随时丢问题过来.",
-        emotion: "你现在的焦虑其实恰好说明你在乎这件事, 不是你能力不够.",
-        progress: "虽然状态波动, 但你的日志里仍保留了学习的连续性, 说明节奏本身是稳的.",
-        nextStep: "先歇一会儿, 然后挑一个最小的动作重启 -- 哪怕只是打开 IDE 写一句 Hello.",
-        taskSuggestion: "放一个极低门槛动作: 只写 5 行 Demo 找找手感.",
-        scheduleSuggestion: "暂停今晚的硬性学习安排, 改做 15 分钟轻量回顾即可",
-        category: "情绪",
+        reply: "我能看出来你今天不是在空转，而是在实打实推进项目。对你这样的成长阶段来说，项目推进的价值很高，因为它会把原本零散的知识真正串起来。" +
+          "\n\n如果把今天的价值说清楚：\n- 你不是只在学，而是在产出\n- 你不是只会做 Demo，而是在形成自己的问题解决路径\n- 每推进一个模块，都会反过来暴露下一轮最值得补的基础" +
+          "\n\n接下来最值得继续追的，是：" + followUp,
+        emotion: emotion === "positive" ? "今天的状态偏积极，像是看见了一点项目推进的手感。" : "状态总体稳定，但项目里可能还有一些没彻底解决的小卡点。",
+        progress: `今天最明显的进展来自「${topics.join("、")}」相关的项目动作。`,
+        nextStep: "把今天推进项目时最卡的一处和最顺的一处各记一条，明天就更容易承接。",
+        taskSuggestion: "把今天项目推进里最关键的一步写进项目日志。",
+        scheduleSuggestion: "明天优先把当前项目里最卡的一个点单独拆开推进。",
+        category,
+        suggestedMetric: "高",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker,
+        extraction,
+      };
+    }
+
+    if (intent === "emotion_support") {
+      return {
+        reply: "这种状态非常正常，尤其是当你一边想补基础、一边又希望项目能往前跑的时候，大脑会很容易过载。" +
+          "\n\n你现在不需要硬撑着把效率拉满，更重要的是先把节奏找回来。给你两个轻量选择：\n- 先停 15~20 分钟，让身体和注意力放松一下\n- 或者只做一个最低门槛动作，比如改 1 个小 bug、写 5 行 Demo，把自己从停滞里拽回来" +
+          "\n\n我会更关心的是：" + followUp,
+        emotion: "你现在更像是在经历阶段性的疲惫或焦虑，而不是能力不够。",
+        progress: "虽然状态起伏，但你愿意把它说出来，本身就是在进行有效的自我觉察。",
+        nextStep: "不要要求自己立刻恢复满状态，先完成一个最小动作就够了。",
+        taskSuggestion: "先完成一个 5 分钟能做完的小动作，把节奏重新接上。",
+        scheduleSuggestion: "今晚不再硬赶进度，把学习缩到 15 分钟以内，留更多恢复空间。",
+        category,
         suggestedMetric: "低",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker: true,
+        extraction,
       };
     }
 
-    if (/计划|安排|节奏|进度|学什么|怎么学|接下来|路线/.test(msg)) {
-      const isBackend = /后端|Java|开发|编程|Spring|数据库/.test(input.user.mainGoal);
+    if (intent === "review_reflection") {
       return {
-        reply: isBackend
-          ? "能集中精力把学习规划这件事拆明白, 这个方向本身就跑对了.\n\n拆轻重:\n- 已有编程基础的部分(变量/循环/分支/基本 OOP)可以倍速过, 重点是和你熟悉语言的差异点\n- 核心模块(框架机制/底层原理/设计模式)需要慢下来每学一个写一段 Demo\n- 容易混淆的是跨语言差异 -- 比如值传递和引用的区别, 容器底层实现的区别\n\n三条执行规则:\n1. 每个核心知识点写 10 行以内 Demo 验证理解\n2. 暂时听不懂的底层原理先截图, 学到后面往回看自然懂\n3. 晚上留 30 分钟手绘一张架构图复盘\n\n今天全程跟着你的节奏, 卡壳了随时说."
-          : "先把目标拆成轻重缓急是最高效的开始.\n\n拆轻重:\n- 通用基础部分可以快进\n- 核心方法论部分慢下节奏每步复盘\n- 容易混淆的概念单独对比\n\n三条执行规则:\n1. 每学完一个模块用一句话总结核心\n2. 不理解的地方先标记, 不打断整体节奏\n3. 晚上留 30 分钟快速复盘\n\n我全程跟你的节奏, 卡壳了随时说.",
-        emotion: "你的规划状态总体平稳, 目标明确.",
-        progress: "能主动拆规划本身就是最高效的学习行为, 说明方法感在形成.",
-        nextStep: "挑今天计划里最核心的一个知识点, 先动手写几行 Demo.",
-        taskSuggestion: isBackend ? "把今天核心知识点的 Demo 代码写好并跑通." : "把今天计划里最重要的一个模块先学完并做笔记.",
-        scheduleSuggestion: "早上高专注时段优先学核心内容, 下午做辅助练习",
-        category: "学习",
+        reply: "这一轮你不是只是做完了事情，而是在开始把过程变成可复盘的材料，这一步很重要。" +
+          "\n\n如果把今天/这一阶段的意义梳理一下：\n- 你已经有了真实推进\n- 也开始能看见哪些环节顺、哪些环节卡\n- 这正是从“忙碌”走向“成长”的分界点" +
+          "\n\n我想顺着问一句：" + followUp,
+        emotion: "你的状态是稳的，而且已经开始形成自己的节奏。",
+        progress: "你现在不只是做事，也在开始看见自己的推进路径。",
+        nextStep: "把这次复盘里最值得保留的一点写下来，明天继续沿着那一点推进。",
+        taskSuggestion: "用 3 句话写下今天最重要的一个收获和一个卡点。",
+        scheduleSuggestion: "明天开始前先看一眼今天的复盘，再决定第一步做什么。",
+        category,
         suggestedMetric: "中",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker,
+        extraction,
       };
     }
 
-    if (/复盘|总结|搞完|做完了|学完了|完成了/.test(msg)) {
+    if (intent === "study_planning") {
       return {
-        reply: "恭喜啃完这个模块! " + input.user.mainGoal.slice(0, 20) + " 的路径上又往前迈了一步, 进度非常稳.\n\n核心梳理:\n- 体系架构: 这个阶段学到的核心概念是什么 -- 先理清主干\n- 高频实操点: 哪些地方是后端开发里真的每天在用的 -- 这些优先打牢\n- 容易掌握不牢的薄弱点: 面试和实际开发里容易被问住的环节 -- 标记出来后续二刷\n\n巩固小任务: 围绕这个模块写一个微型 Demo, 把常用 API 都用一遍就彻底熟了.\n\n接下来可以衔接下一个模块, 继续按这个节奏走就行.",
-        emotion: "稳步推进的状态很好, 保持节奏.",
-        progress: "完成一个模块的复盘本身就是在把方法沉淀为体系.",
-        nextStep: "围绕刚完成的模块写一个微型 Demo, 把核心 API 都用一遍.",
-        taskSuggestion: "写一个涵盖本模块核心知识点的微型 Demo.",
-        scheduleSuggestion: "今晚留 30 分钟低打扰时间做复盘总结",
-        category: "学习",
+        reply: "你现在最需要的不是再堆很多任务，而是把学习顺序排得更顺手。" +
+          "\n\n我会建议按轻重来：\n- 通用语法和你熟悉的部分可以快速过\n- 跟后端真正强相关的模块要慢下来做 Demo\n- 容易反复卡住的点，要单独拆出来复盘" +
+          "\n\n如果按你当前阶段，我会把重点继续放在：" + topics.join("、") + "。" +
+          "\n\n接下来我想确认的是：" + followUp,
+        emotion: "你的规划感是在线的，这很好。",
+        progress: "你已经在从“盲学”走向“有顺序地学”。",
+        nextStep: "今天先只定一个模块，把它学透，不急着铺开太多。",
+        taskSuggestion: "把接下来一到两天最关键的学习点列成清单。",
+        scheduleSuggestion: "把最烧脑的内容放到你最清醒的时段。",
+        category,
         suggestedMetric: "中",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker,
+        extraction,
       };
     }
 
-    if (/是什么|区别|怎么|为什么|底层|原理|概念|面试/.test(msg)) {
+    if (intent === "tech_help") {
       return {
-        reply: "这个问题问得好, 我先给最核心的答案, 再分层讲清楚.\n\n核心结论: 这个知识点的本质是理解它在整个技术体系里起什么作用.\n\n分层拆解:\n1. 定义层面 -- 先理解它是什么和为什么需要它\n2. 特性层面 -- 关键规则和边界条件\n3. 对比层面 -- 跟你已经会的东西有什么区别, 减少记忆成本\n4. 场景层面 -- 这个知识点在实际开发中怎么用\n\n面试高频考点, 建议理解后能用代码讲出来.",
-        emotion: "你的状态总体平稳, 适合继续推进.",
-        progress: "主动追问概念和原理, 说明在往深层理解走, 这是从会用走向懂的标志.",
-        nextStep: "把刚才的核心结论用自己的话写下来, 最好配一行代码示例.",
-        taskSuggestion: "写一个包含这个知识点的微型 Demo, 验证理解.",
-        scheduleSuggestion: "今晚预留 30 分钟低打扰时间来推进这件事",
-        category: "学习",
+        reply: "这个问题问得很对，我先给结论，再帮你拆层次。" +
+          "\n\n核心上，你现在问的不是一个孤立知识点，而是它在整个技术体系里怎么和你已有基础接上。" +
+          "\n\n可以这样理解：\n1. 先定义它是什么\n2. 再看关键规则和边界\n3. 再和你熟悉的语言或经验对比\n4. 最后落到真实开发或项目里怎么用" +
+          "\n\n如果你愿意，我下一轮可以直接按“结论 → 对比 → 代码示例”的方式继续帮你展开。",
+        emotion: "你现在更像是在往深层理解走，而不是只停留在会用。",
+        progress: "愿意追问原理本身就是能力升级的信号。",
+        nextStep: "把你最想弄懂的那个点再具体说一句，我就按代码和场景继续拆。",
+        taskSuggestion: "把这个概念对应的一个最小 Demo 写出来，边写边理解。",
+        scheduleSuggestion: "今晚留 20 分钟，只围绕这一个点做定向理解。",
+        category,
         suggestedMetric: "中",
+        detectedIntent: intent,
+        extractedTopic: topics.join("、"),
+        followUpQuestion: followUp,
+        hasBlocker,
+        extraction,
       };
     }
 
     return {
-      reply: (input.user.replyStyle === "结构清晰" ? "我帮你先把这个拆开来看." : "我在, 我们可以从容地把这件事理清楚.") + "\n\n你之前提到的长期目标是 " + input.user.mainGoal.slice(0, 24) + ", 当前输入是 " + msg.slice(0, 24) + ". 这说明你在围绕真正重要的事情行动.\n\n建议从这个角度切入: 先把核心问题定义清楚, 再拆成可操作的小步骤. 每一步不用大, 但每一步都要有明确的产出.\n\n我全程在, 任何时候需要更深地拆解某个点, 直接把问题丢过来.",
-      emotion: "你的状态总体平稳, 适合继续推进.",
-      progress: "这条输入与目标 " + input.user.mainGoal.slice(0, 16) + " 直接相关.",
-      nextStep: "把这个问题拆成一个今天能完成的小动作.",
-      taskSuggestion: "把当前话题的核心动作完成并做简要记录.",
-      scheduleSuggestion: "今晚预留 30 分钟低打扰时间来推进这件事",
-      category: domain as any,
+      reply: (input.user.replyStyle === "结构清晰" ? "我先帮你把这件事梳理一下。" : "我在，我们可以慢慢把这件事说清楚。") +
+        "\n\n你刚刚说的内容，其实已经和你的长期目标「" + input.user.mainGoal + "」有连接。" +
+        " 我更关心的是，今天这件事对你来说代表的是推进、卡点，还是一种状态变化。" +
+        "\n\n如果你愿意，我们可以顺着刚才这句话继续往下聊：" + followUp,
+      emotion: "你的状态总体平稳，适合继续推进。",
+      progress: "这条输入和你当前的成长主线是相关的。",
+      nextStep: "把这句话背后的关键点再多展开一点，我们就能更准确地拆下一步。",
+      taskSuggestion: "先把今天最想说清楚的一件事补充完整。",
+      scheduleSuggestion: "今晚留一点低打扰时间，把今天最重要的一件事说清楚。",
+      category: category as any,
       suggestedMetric: "中",
+      detectedIntent: intent,
+      extractedTopic: topics.join("、"),
+      followUpQuestion: followUp,
+      hasBlocker,
+      extraction,
     };
   },
 
@@ -115,6 +244,7 @@ export const fallbackAi = {
       reason: "优先处理 " + input.user.mainProblem.slice(0, 20) + " 会更直接推动长期目标.",
     };
   },
+
   decomposeTask(input: { taskTitle: string }): TaskDecompositionResult {
     return {
       tasks: [
@@ -125,6 +255,7 @@ export const fallbackAi = {
       summary: "Bloom 已经把当前任务拆成更容易开始的三个动作, 建议从第一步直接启动.",
     };
   },
+
   parseRecord(input: { content: string }): ParsedRecordResult {
     const category = determineCategory(input.content);
     const emotion = determineEmotion(input.content);

@@ -1,10 +1,12 @@
 import type {
+  ConversationExtraction,
   DailyPlan,
   DailyTask,
   Emotion,
   Goal,
   GrowthDirection,
   MessageSummary,
+  PrimaryIntent,
   UserProfile,
   UserSettings,
 } from "@bloom/shared";
@@ -41,6 +43,11 @@ export interface ChatReplyResult {
   scheduleSuggestion?: string;
   category?: string;
   suggestedMetric?: string;
+  detectedIntent?: PrimaryIntent;
+  extractedTopic?: string;
+  followUpQuestion?: string;
+  hasBlocker?: boolean;
+  extraction?: Omit<ConversationExtraction, "id" | "threadId" | "messageId" | "createdAt">;
 }
 
 export interface CoreTaskResult {
@@ -71,6 +78,7 @@ export interface ReportSynthesisResult {
 export interface AIConversationResult {
   assistantText: string;
   summary: MessageSummary;
+  extraction?: Omit<ConversationExtraction, "id" | "threadId" | "messageId" | "createdAt">;
   category: GrowthDirection | "情绪";
   emotion: Emotion;
   scoreDelta: number;

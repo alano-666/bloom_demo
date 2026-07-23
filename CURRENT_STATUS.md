@@ -32,6 +32,7 @@
 - DELETE /api/session/threads/:threadId 清理消息和事件
 - POST /api/session/evening-summary 晚间总结 API（自动生成今日回顾 + 轻量追问）
 - 目标历史追踪：修改 mainGoal/mainProblem 时记录 GoalHistoryEntry，显示在季报和年报中
+- ConversationExtraction 已落地：每条用户消息写入 primaryIntent / topics / hasProgress / hasBlocker / suggestedFollowUp
 - 日程 source 统一为 ai / manual
 - fallback AI 覆盖 7 场景（代码报错/情绪波动/学习规划/复盘总结/知识问答/计划/默认）
 - 雷达维度从用户目标文本动态推导（不再硬编码产品经理维度）

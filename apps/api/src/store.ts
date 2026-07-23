@@ -413,6 +413,33 @@ export class DemoStore {
     });
 
     const event = this.createEvent(input.content, "session", result.category, result.emotion, result.scoreDelta, result.focusMinutes);
+    const extraction = result.extraction
+      ? {
+          id: nanoid(),
+          threadId: input.threadId,
+          messageId: userMessage.id,
+          createdAt: new Date().toISOString(),
+          ...result.extraction,
+        }
+      : {
+          id: nanoid(),
+          threadId: input.threadId,
+          messageId: userMessage.id,
+          createdAt: new Date().toISOString(),
+          primaryIntent: result.summary.detectedIntent ?? "light_companion",
+          secondaryIntent: undefined,
+          confidence: 0.65,
+          topics: result.summary.extractedTopic ? [result.summary.extractedTopic] : [result.category],
+          emotion: result.emotion,
+          hasProgress: /推进|完成|学|做|实现|跑通/.test(input.content),
+          hasBlocker: Boolean(result.summary.hasBlocker),
+          hasGoalChange: false,
+          progressSummary: result.summary.progress,
+          blockerSummary: result.summary.hasBlocker ? result.summary.nextStep : undefined,
+          reflectionSummary: /今天|刚刚|复盘|总结/.test(input.content) ? result.summary.progress : undefined,
+          suggestedFollowUp: result.summary.followUpQuestion,
+        };
+
     const assistantMessage: Message = {
       id: nanoid(),
       threadId: input.threadId,
@@ -424,6 +451,7 @@ export class DemoStore {
     };
 
     this.state.messages.push(userMessage, assistantMessage);
+    this.state.extractions.push(extraction);
     this.state.events.unshift(event);
     this.bumpGoals(event);
     this.bumpMetrics(event);
