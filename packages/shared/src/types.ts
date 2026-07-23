@@ -255,10 +255,20 @@ export interface DecomposeTaskResponse {
   summary: string;
 }
 
+export interface GoalHistoryEntry {
+  id: string;
+  timestamp: string;
+  previousGoal: string;
+  newGoal: string;
+  previousProblem: string;
+  newProblem: string;
+}
+
 export interface DemoState {
   profile: UserProfile | null;
   goals: Goal[];
   goalLogs: GoalProgressLog[];
+  goalHistory: GoalHistoryEntry[];
   events: GrowthEvent[];
   threads: ConversationThread[];
   messages: Message[];

@@ -73,6 +73,7 @@ app.post("/api/session/message", async (req, res) => {
   const body = z.object({ threadId: z.string().min(1), content: z.string().min(1), attachments: z.array(attachmentSchema).optional() }).parse(req.body);
   res.json(await userGrowthService.postMessage(userId(req), body));
 });
+app.post("/api/session/evening-summary", async (req, res) => res.json(await userGrowthService.eveningSummary(userId(req))));
 app.get("/api/trajectory", async (req, res) => res.json(await userGrowthService.buildTrajectory(userId(req))));
 app.get("/api/reports", async (req, res) => {
   const period = z.enum(["week", "month", "quarter", "year"]).parse((req.query.period as ReportPeriod | undefined) ?? "week");

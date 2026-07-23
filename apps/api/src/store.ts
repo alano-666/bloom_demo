@@ -131,6 +131,11 @@ export class DemoStore {
 
   async updateProfile(input: UpdateProfileInput) {
     if (!this.state.profile) return this.bootstrap();
+    const previousGoal = this.state.profile.mainGoal;
+    const previousProblem = this.state.profile.mainProblem;
+    const hasGoalChange = input.mainGoal !== previousGoal;
+    const hasProblemChange = input.mainProblem !== previousProblem;
+
     this.state.profile = {
       ...this.state.profile,
       name: input.name,
@@ -142,6 +147,18 @@ export class DemoStore {
       longTermGoal: input.mainGoal,
       currentChallenge: input.mainProblem,
     };
+
+    if (hasGoalChange || hasProblemChange) {
+      this.state.goalHistory.push({
+        id: nanoid(),
+        timestamp: new Date().toISOString(),
+        previousGoal,
+        newGoal: input.mainGoal,
+        previousProblem,
+        newProblem: input.mainProblem,
+      });
+    }
+
     await this.generateCoreTask();
     return this.bootstrap();
   }
@@ -448,6 +465,98 @@ export class DemoStore {
     };
   }
 
+  eveningSummary() {
+    const name = this.state.profile?.name ?? "Bloom 用户";
+    const todayLabel = normalizeMetricDate(new Date());
+    const todaysMessages = this.state.messages.filter(
+      (message) => new Date(message.createdAt).toDateString() === new Date().toDateString(),
+    );
+    const todaysEvents = this.state.events.filter(
+      (event) => new Date(event.date).toDateString() === new Date().toDateString(),
+    );
+    const plan = this.state.dailyPlan ?? buildDailyPlanFromProfile(this.state.profile as UserProfile);
+    const latestMetric = this.state.metrics[this.state.metrics.length - 1];
+    const todayFocusMin = todaysEvents.reduce((sum, event) => sum + event.focusMinutes, 0);
+    const todayDelta = todaysEvents.reduce((sum, event) => sum + event.scoreDelta, 0);
+    const emotionLabel = latestMetric
+      ? latestMetric.moodScore >= 75
+        ? "良好"
+        : latestMetric.moodScore >= 60
+          ? "平稳"
+          : "波动"
+      : "平稳";
+
+    // Pick a lightweight follow-up question based on today's messages
+    let followUp = "今天有什么特别想记录的吗？";
+    const userMessages = todaysMessages.filter((msg) => msg.role === "user").map((msg) => msg.content).join(" ");
+    if (userMessages.length > 20) {
+      if (/报错|bug|error|卡|不会|不懂|难/.test(userMessages)) followUp = "白天提到的那个卡点，现在回头看看，有没有新的思路？";
+      else if (/完成|做完|搞定|学会|跑通了/.test(userMessages)) followUp = "今天完成的事情里，哪一件让你最有收获感？";
+      else if (/计划|安排|节奏|接下来/.test(userMessages)) followUp = "明天的重点有想好怎么排吗？需要我帮你梳理一下吗？";
+      else followUp = "今天学的东西里，有没有哪个点让你觉得特别有意思或特别困惑的？";
+    }
+
+    const summaryContent = `晚上好 ${name}，这是今天的 Bloom 晚间小结 🌙
+
+📋 今日核心任务：「${plan.focusTitle.slice(0, 30)}」— 进度 ${plan.progress}%
+
+📊 今日数据：
+  - 专注时长：${todayFocusMin} 分钟
+  - 成长值变化：+${todayDelta} 分
+  - 情绪状态：${emotionLabel}
+  ${todaysEvents.filter((e) => e.source === "focus").length ? "- 完成专注时段：" + todaysEvents.filter((e) => e.source === "focus").length + " 次" : ""}
+
+🌱 一个小问题：
+  ${followUp}`;
+
+    let summaryThreadId = "thread-evening-summary";
+    const existingThread = this.state.threads.find((thread) => thread.id === summaryThreadId);
+    if (!existingThread) {
+      this.state.threads.unshift({
+        id: summaryThreadId,
+        title: "晚间成长总结",
+        preview: summaryContent.slice(0, 60),
+        updatedAt: new Date().toISOString(),
+        lastInputContent: summaryContent.slice(0, 60),
+        lastInputAt: new Date().toISOString(),
+      });
+    } else {
+      const tIndex = this.state.threads.findIndex((thread) => thread.id === summaryThreadId);
+      if (tIndex >= 0) {
+        const thread = this.state.threads[tIndex];
+        this.state.threads[tIndex] = {
+          ...thread,
+          preview: summaryContent.slice(0, 60),
+          updatedAt: new Date().toISOString(),
+          lastInputContent: summaryContent.slice(0, 60),
+          lastInputAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    const assistantMessage: Message = {
+      id: nanoid(),
+      threadId: summaryThreadId,
+      role: "assistant",
+      content: summaryContent,
+      createdAt: new Date().toISOString(),
+      summary: {
+        memory: `今日晚间总结：${plan.focusTitle.slice(0, 30)}`,
+        emotion: `${emotionLabel}，${todayDelta > 0 ? "今天有正向推进" : "继续稳步前行"}`,
+        progress: `今日任务进度 ${plan.progress}%，专注 ${todayFocusMin}分钟`,
+        nextStep: followUp,
+        taskSuggestion: "完成晚间复盘并记录今天的收获",
+        scheduleSuggestion: "明天继续推进核心任务",
+      },
+    };
+    this.state.messages.push(assistantMessage);
+
+    return {
+      threadId: summaryThreadId,
+      session: this.getSession(summaryThreadId),
+    };
+  }
+
   updateGoal(goalId: string, progress: number) {
     this.state.goals = this.state.goals.map((goal) =>
       goal.id === goalId ? { ...goal, progress: Math.max(0, Math.min(100, progress)) } : goal,
@@ -566,6 +675,33 @@ export class DemoStore {
       // keep derived copy
     }
 
+    const goalHistoryCount = this.state.goalHistory.length;
+    const recentGoalChanges = this.state.goalHistory.slice(-3);
+
+    if ((period === "quarter" || period === "year") && recentGoalChanges.length) {
+      const latest = recentGoalChanges[recentGoalChanges.length - 1];
+      keyEvents.push({
+        id: latest.id,
+        title: "目标方向调整",
+        summary: `从「${latest.previousGoal.slice(0, 12)}…」→「${latest.newGoal.slice(0, 12)}…」`,
+        detail: `${new Date(latest.timestamp).toLocaleDateString("zh-CN")}：你重新校准了目标方向。从「${latest.previousGoal}」转向「${latest.newGoal}」，这是对自我认知的一次深化。`,
+      });
+      if (goalHistoryCount >= 2) {
+        synthesizedTitle = "在持续校准中找到更清晰的方向";
+        synthesizedNextSuggestion = this.deriveNextSuggestion(dominantEmotion) + " 你已经在目标校准上迭代了多次，建议把当前方向沉淀为可量化的里程碑。";
+      }
+    }
+
+    const stats: { label: string; value: string; hint: string }[] = [
+      { label: "专注时长", value: `${totalFocusHours.toFixed(1)} h`, hint: `+${Math.max(0.6, scoreBoost / 2).toFixed(1)}h` },
+      { label: "记录天数", value: `${recordDays} / ${Math.max(recordDays, 7)}`, hint: recordDays >= 5 ? "稳定记录" : "继续保持" },
+      { label: "完成目标", value: `${completedGoals} 个`, hint: `进行中 ${this.state.goals.length - completedGoals}` },
+      { label: "平均睡眠", value: `${averageSleep.toFixed(1)} h`, hint: "虚拟数据" },
+    ];
+    if (goalHistoryCount > 0 && (period === "quarter" || period === "year")) {
+      stats.push({ label: "目标迭代", value: `${goalHistoryCount} 次`, hint: "持续校准方向" });
+    }
+
     return {
       period,
       rangeLabel: template.rangeLabel,
@@ -574,12 +710,7 @@ export class DemoStore {
       score: template.score + scoreBoost,
       delta: this.deriveTrajectoryDelta(),
       highlights: keyEvents.length ? keyEvents : template.highlights,
-      stats: [
-        { label: "专注时长", value: `${totalFocusHours.toFixed(1)} h`, hint: `+${Math.max(0.6, scoreBoost / 2).toFixed(1)}h` },
-        { label: "记录天数", value: `${recordDays} / ${Math.max(recordDays, 7)}`, hint: recordDays >= 5 ? "稳定记录" : "继续保持" },
-        { label: "完成目标", value: `${completedGoals} 个`, hint: `进行中 ${this.state.goals.length - completedGoals}` },
-        { label: "平均睡眠", value: `${averageSleep.toFixed(1)} h`, hint: "虚拟数据" },
-      ],
+      stats,
       nextSuggestion: synthesizedNextSuggestion,
     };
   }

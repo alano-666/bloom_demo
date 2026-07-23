@@ -22,7 +22,18 @@ export function SettingsPage() {
 
   const values = watch();
   useTheme(values.darkMode);
-  useLocalReminder(values.reminderEnabled, values.reminderWindow, () => window.alert("Bloom 提醒你：别忘了在约定时间记录今天的成长。"));
+  useLocalReminder(
+    values.reminderEnabled,
+    values.reminderWindow,
+    values.eveningReviewTime,
+    () => window.alert("Bloom 提醒你：别忘了在约定时间记录今天的成长。"),
+    () => {
+      // Evening reminder fires - the user can go to the Session page to see the summary
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        new Notification("Bloom", { body: "来看看今天的成长小结 🌙", icon: "/favicon-64x64.png" });
+      }
+    },
+  );
 
   useEffect(() => {
     if (bootstrap?.settings) {

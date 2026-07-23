@@ -92,4 +92,7 @@ export const userGrowthService = {
   async parseQuickLog(userId: string, content: string) {
     return mutate(userId, (store) => store.parseQuickLog(content));
   },
+  async eveningSummary(userId: string) {
+    return mutate(userId, (store) => store.eveningSummary());
+  },
 };

@@ -50,6 +50,7 @@ export const apiClient = {
   deleteThread: async (threadId: string) => (await api.delete<{ ok: boolean }>(`/session/threads/${threadId}`)).data,
   getSession: async (threadId: string) => (await api.get<SessionResponse>(`/session/${threadId}`)).data,
   postMessage: async (payload: SessionMessageInput) => (await api.post<PostMessageResponse>("/session/message", payload)).data,
+  eveningSummary: async () => (await api.post<{ threadId: string; session: SessionResponse }>("/session/evening-summary")).data,
   generateCoreTask: async () => (await api.post<DashboardData["dailyPlan"]>("/dashboard/core-task/generate")).data,
   decomposeTask: async () => (await api.post<DecomposeTaskResponse>("/dashboard/core-task/decompose")).data,
   completeFocus: async (minutes: number, markDone = true) => (await api.post<FocusCompleteResponse>("/dashboard/focus/complete", { minutes, markDone })).data,
