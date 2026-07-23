@@ -5,7 +5,13 @@
 - API:  Vercel Serverless → https://bloom-demo-api.vercel.app/api
 - DB:   Supabase → https://vocywpbwyvrleswchjde.supabase.co
 
-## 已完成功能
+## 已知网络问题
+- Vercel 域名 bloom-demo-api.vercel.app 从中国大陆网络直连**超时**
+- GitHub Pages alano-666.github.io 间歇性可访问
+- 挂梯子后全部正常
+- 如果你的浏览器无法登录，请确保浏览器流量也经过梯子
+
+## 当前实现的功能
 
 ### UI
 - 核心任务可编辑标题（点击「编辑任务标题」）
@@ -42,3 +48,4 @@
 - bailian/zhipu API key 未在生产环境配置 → AI 回复走 fallback
 - 文件/图片/语音上传只在前端提取文本发送，后端未存储原始文件
 - 目标标记进展后 store 回写需再排查
+- **中国网络无法直连 Vercel，需梯子或自定义域名**
