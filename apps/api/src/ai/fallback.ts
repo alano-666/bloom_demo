@@ -67,16 +67,36 @@ function genFollowUp(intent: PrimaryIntent, content: string): string {
   }
 }
 
+function buildCarryOverLead(pendingIntent?: PrimaryIntent, pendingFollowUp?: string) {
+  if (!pendingIntent || !pendingFollowUp) return "";
+  switch (pendingIntent) {
+    case "daily_log":
+      return "我记得上一轮我是在追问你今天最有收获的那一块，所以这次我会直接顺着你的回应往下接。\n\n";
+    case "project_progress":
+      return "上一轮我们停在项目推进的关键节点上，这次我直接接着你的回应往下拆。\n\n";
+    case "emotion_support":
+      return "我记得上一轮更关心的是你的状态而不是进度，所以这次我先沿着你的情绪回应。\n\n";
+    case "study_planning":
+      return "上一轮我们在定学习顺序，这次我会顺着你的回应继续把路线压实。\n\n";
+    case "tech_help":
+      return "上一轮我们停在一个具体技术问题上，这次我直接按你刚补充的内容继续往下讲。\n\n";
+    default:
+      return "我记得上一轮留下了一个追问，这次我会顺着你的回应继续往下接。\n\n";
+  }
+}
+
 export const fallbackAi = {
   chatReply(input: {
     latestMessage: string;
     user: { mainGoal: string; mainProblem: string; replyStyle: string };
+    thread?: { pendingIntent?: PrimaryIntent; pendingFollowUp?: string };
   }): ChatReplyResult {
     const msg = input.latestMessage;
     const intent = determineIntent(msg);
     const emotion = determineEmotion(msg);
     const topics = extractTopics(msg);
     const followUp = genFollowUp(intent, msg);
+    const carryOverLead = buildCarryOverLead(input.thread?.pendingIntent, input.thread?.pendingFollowUp);
     const hasBlocker = /卡|不会|不懂|报错|烦|焦虑|压力|不知道怎么|没办法/.test(msg);
     const hasProgress = /完成|推进|搞定|做了|学了|跑通|实现|写好|看完|写完|学会/.test(msg);
     const extraction = {
@@ -97,7 +117,7 @@ export const fallbackAi = {
     // --- tech_help ---
     if (intent === "tech_help") {
       return {
-        reply:  "这个问题值得花时间搞清楚。\n\n"
+        reply:  carryOverLead + "这个问题值得花时间搞清楚。\n\n"
               + "先给你核心结论：这不是你一个人卡，而是从会用走向真懂时的必经阶段。\n\n"
               + "你可以先试着用自己的一句话把这个问题说清楚，然后写一个最小 Demo 跑通，比看一百遍文档都有用。\n\n"
               + followUp,
@@ -119,7 +139,7 @@ export const fallbackAi = {
     // --- emotion_support ---
     if (intent === "emotion_support") {
       return {
-        reply:  "我听到了。这种状态完全正常，不是你的能力问题。\n\n"
+        reply:  carryOverLead + "我听到了。这种状态完全正常，不是你的能力问题。\n\n"
               + "高强度学习中最容易被忽略的不是知识难度，而是情绪和体力的自然消耗。\n\n"
               + "今天不用再逼自己往前冲，只做一件最小的事就够了。哪怕只是打开 IDE 写 5 行 Demo，也是在重新建立节奏感。\n\n"
               + followUp,
@@ -141,7 +161,7 @@ export const fallbackAi = {
     // --- study_planning ---
     if (intent === "study_planning") {
       return {
-        reply:  "你现在最需要的不是更多任务，而是更清晰的先后顺序。\n\n"
+        reply:  carryOverLead + "你现在最需要的不是更多任务，而是更清晰的先后顺序。\n\n"
               + "先把你要学的东西分成三层：\n"
               + "1. 跟你已有基础差距不大的 → 快速过\n"
               + "2. 跟你的核心方向强相关的 → 慢下来做 Demo\n"
@@ -166,7 +186,7 @@ export const fallbackAi = {
     // --- review_reflection ---
     if (intent === "review_reflection") {
       return {
-        reply:  "这种感觉很重要——你不是在做完就忘了，而是在把经历变成可回顾的材料。\n\n"
+        reply:  carryOverLead + "这种感觉很重要——你不是在做完就忘了，而是在把经历变成可回顾的材料。\n\n"
               + "如果让我帮你总结：你已经不是只在「做事情」，而是开始「看见自己怎么做事」。这一步，本身就是从执行层跳到成长层的分界线。\n\n"
               + followUp,
         emotion: "状态稳的，而且有了自己的节奏感。",
@@ -187,7 +207,7 @@ export const fallbackAi = {
     // --- project_progress ---
     if (intent === "project_progress") {
       return {
-        reply:  "能做到这一步，说明你已经开始把学的东西往真实产出上接了，这个价值比单纯学知识点高很多。\n\n"
+        reply:  carryOverLead + "能做到这一步，说明你已经开始把学的东西往真实产出上接了，这个价值比单纯学知识点高很多。\n\n"
               + "每推进一个模块，也会反过来暴露下一轮最值得补的基础。\n\n"
               + followUp,
         emotion: "像是看见了一点项目推进的手感。",
@@ -208,7 +228,7 @@ export const fallbackAi = {
     // --- goal_shift ---
     if (intent === "goal_shift") {
       return {
-        reply:  "方向变了很正常，不是反复横跳，而是你对自我的认知在加深。\n\n"
+        reply:  carryOverLead + "方向变了很正常，不是反复横跳，而是你对自我的认知在加深。\n\n"
               + "我会把你这次的变化记下来，未来在报告里你会看到这些转折其实都是成长留下的痕迹。\n\n"
               + followUp,
         emotion: "这是思考后的主动调整，不是摇摆。",
@@ -228,7 +248,7 @@ export const fallbackAi = {
 
     // --- daily_log (and default fallback) ---
     return {
-      reply:  "我听到了。\n\n"
+      reply:  carryOverLead + "我听到了。\n\n"
             + `你提到的这些和你的长期目标「${input.user.mainGoal}」是相关的。`
             + (hasProgress ? "今天有明显的推进信号，这很好。" : "不管是推进还是表达，都是成长的一部分。")
             + "\n\n" + followUp,

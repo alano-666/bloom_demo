@@ -66,9 +66,10 @@ export const useBloomStore = create<BloomState>((set) => ({
             dashboard: payload.dashboard,
             goals: payload.goals,
             reportSummary: payload.reportSummary,
-            recentThreads: state.bootstrap.recentThreads.map((thread) =>
-              thread.id === payload.session.thread.id ? payload.session.thread : thread,
-            ),
+            recentThreads: [
+              payload.session.thread,
+              ...state.bootstrap.recentThreads.filter((thread) => thread.id !== payload.session.thread.id),
+            ],
           }
         : state.bootstrap,
     })),

@@ -15,6 +15,9 @@ export interface AiThreadContext {
   title: string;
   latestUserContent?: string;
   latestAssistantContent?: string;
+  pendingFollowUp?: string;
+  pendingIntent?: PrimaryIntent;
+  previousExtractionSummary?: string;
 }
 
 export interface AiGoalContext {

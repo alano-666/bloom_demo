@@ -131,6 +131,10 @@ export const aiProvider: AiProvider = {
           mainProblem: input.user.mainProblem,
           replyStyle: input.user.replyStyle,
         },
+        thread: {
+          pendingIntent: input.thread.pendingIntent,
+          pendingFollowUp: input.thread.pendingFollowUp,
+        },
       });
       const emotion = normalizeEmotion(fallback.emotion);
       const category = normalizeCategory(fallback.category ?? "职业");

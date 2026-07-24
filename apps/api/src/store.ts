@@ -422,10 +422,7 @@ export class DemoStore {
 
     const thread = this.state.threads.find((item) => item.id === input.threadId) ?? this.state.threads[0];
     const previousFollowUp = this.markFollowUpResolved(input.threadId, input.content);
-    const previousSummary = previousFollowUp
-      ? `（用户在上一条成长记录里提到了「${previousFollowUp.topics.join("、")}」，目前正在回应追问之中。）`
-      : undefined;
-    const isAnsweringFollowUp = Boolean(previousFollowUp);
+    const isAnsweringFollowUp = Boolean(previousFollowUp && previousFollowUp.followUpAnswered);
 
     const result = await aiProvider.chatReply({
       user: this.buildAiUserContext(),
@@ -433,6 +430,9 @@ export class DemoStore {
         title: thread?.title ?? "成长会话",
         latestUserContent: input.content,
         latestAssistantContent: this.state.messages.filter((message) => message.threadId === input.threadId && message.role === "assistant").slice(-1)[0]?.content,
+        pendingFollowUp: previousFollowUp?.suggestedFollowUp,
+        pendingIntent: previousFollowUp?.primaryIntent,
+        previousExtractionSummary: previousFollowUp?.progressSummary ?? previousFollowUp?.blockerSummary,
       },
       goals: this.state.goals.map((goal) => ({
         title: goal.title,

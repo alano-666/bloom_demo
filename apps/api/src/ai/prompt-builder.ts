@@ -28,6 +28,9 @@ export const buildChatPrompt = (input: {
 当前问题：${input.user.mainProblem}
 回复风格：${input.user.replyStyle}
 当前对话主题：${input.thread.title}
+上一轮待承接追问：${input.thread.pendingFollowUp ?? "无"}
+上一轮意图：${input.thread.pendingIntent ?? "无"}
+上一轮抽取摘要：${input.thread.previousExtractionSummary ?? "无"}
 目标列表：${input.goals.map((goal) => `${goal.title}(${goal.progress}%)`).join("；")}
 用户最新输入：${input.latestMessage}
 
@@ -39,7 +42,11 @@ export const buildChatPrompt = (input: {
 - taskSuggestion: 一条今天就能开始的小任务
 - scheduleSuggestion: 具体时间安排建议
 - category: 成长类别（职业/学习/健康/生活/情绪）
-- suggestedMetric: 简短指标描述`;
+- suggestedMetric: 简短指标描述
+- detectedIntent: 对本轮用户输入的意图识别
+- extractedTopic: 本轮对话的主题提取
+- followUpQuestion: 若适合继续追问，则给出一句轻追问
+- hasBlocker: 是否存在明显卡点（true/false）`;
 };
 
 
