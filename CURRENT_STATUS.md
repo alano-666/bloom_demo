@@ -25,8 +25,10 @@
 - 语音 (Web Speech API) / 文件 (FileReader) / 图片 (base64) 上传入口
 - 侧栏头像与用户名实时同步
 
-### Backend
-- Supabase Auth 注册（admin API 自动确认 + 签发 session token）
+### 后端 AI
+- 真实 AI 接入：**阿里百炼 (Bailian)**，生产环境已部署
+- Fallback: 智谱 API / 规则逻辑
+- fallback AI 覆盖 8 场景意图识别（admin API 自动确认 + 签发 session token）
 - requireUser 中间件验证 JWT
 - 按 userId 隔离成长状态（bootstrap/session/goals/trajectory/reports/settings）
 - DELETE /api/session/threads/:threadId 清理消息和事件
